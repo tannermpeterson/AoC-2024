@@ -33,7 +33,7 @@ mod day1 {
             .zip(list2.iter())
             .map(|(n1, n2)| (n2 - n1).abs())
             .sum();
-        println!("res: {res}");
+        println!("D1P1: {res}");
     }
 
     #[test]
@@ -58,6 +58,78 @@ mod day1 {
                 n2o = list2_iter.next();
             }
         }
-        println!("score: {score}");
+        println!("D1P2: {score}");
+    }
+}
+
+mod day2 {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    fn load_inputs() -> Vec<Vec<u32>> {
+        let file = File::open("inputs/day2.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        buf_reader
+            .lines()
+            .map(|line| {
+                line.unwrap()
+                    .split(" ")
+                    .map(|nstr| nstr.parse().unwrap())
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn is_report_safe(levels: &Vec<u32>) -> bool {
+        let increasing = levels[0] < levels[1];
+        let mut levels_iter = levels.iter();
+        let mut l = levels_iter.next().unwrap();
+        for next in levels_iter {
+            let diff = (*next as i32) - (*l as i32);
+            if diff == 0 || diff.abs() > 3 || (diff > 0) != increasing {
+                return false;
+            }
+            l = next;
+        }
+        true
+    }
+
+    #[test]
+    fn part1() {
+        let inputs = load_inputs();
+        let num_safe: u32 = inputs
+            .iter()
+            .fold(0, |count, levels| count + is_report_safe(levels) as u32);
+        println!("D2P1: {num_safe}");
+    }
+
+    fn is_report_safe_with_dampener(levels: &Vec<u32>) -> bool {
+        // TODO find a way to do this that isn't O(n^2), i.e. rewrite is_report_safe
+        for idx_to_drop in 0..levels.len() {
+            let partial_levels: Vec<u32> = levels
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, level)| {
+                    if idx != idx_to_drop {
+                        Some(*level)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if is_report_safe(&partial_levels) {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn part2() {
+        let inputs = load_inputs();
+        let num_safe: u32 = inputs.iter().fold(0, |count, levels| {
+            count + is_report_safe_with_dampener(levels) as u32
+        });
+        println!("D2P2: {num_safe}");
     }
 }
