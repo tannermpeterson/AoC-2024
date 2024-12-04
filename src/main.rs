@@ -136,11 +136,11 @@ mod day2 {
 
 mod day3 {
     use std::fs::File;
-    use std::io::{BufRead, BufReader, Read};
+    use std::io::Read;
 
     fn load_inputs() -> String {
         let mut buf = String::new();
-        let file = File::open("inputs/day3.txt")
+        let _ = File::open("inputs/day3.txt")
             .unwrap()
             .read_to_string(&mut buf);
         buf
@@ -197,5 +197,94 @@ mod day3 {
             .flat_map(|s| s.split("mul").filter_map(find_mul))
             .sum();
         println!("D3P2: {res}");
+    }
+}
+
+mod day4 {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    fn load_inputs() -> Vec<Vec<char>> {
+        let file = File::open("inputs/day4.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        buf_reader
+            .lines()
+            .map(|line| line.unwrap().chars().collect())
+            .collect()
+    }
+
+    const TARGET: [char; 3] = ['M', 'A', 'S'];
+
+    fn search_xmas_from_pos(
+        inputs: &Vec<Vec<char>>,
+        r_start: usize,
+        c_start: usize,
+        r_inc: isize,
+        c_inc: isize,
+    ) -> bool {
+        let r_max = inputs.len() - 1;
+        let c_max = inputs[0].len() - 1;
+
+        let mut r = r_start;
+        let mut c = c_start;
+        r = r.wrapping_add_signed(r_inc);
+        c = c.wrapping_add_signed(c_inc);
+        for ch in TARGET.iter() {
+            if r > r_max || c > c_max || inputs[r][c] != *ch {
+                return false;
+            }
+            r = r.wrapping_add_signed(r_inc);
+            c = c.wrapping_add_signed(c_inc);
+        }
+        return true;
+    }
+
+    #[test]
+    fn part1() {
+        let inputs = load_inputs();
+
+        let mut res = 0;
+
+        for r_start in 0..inputs.len() {
+            for c_start in 0..inputs[0].len() {
+                if inputs[r_start][c_start] != 'X' {
+                    continue;
+                }
+                for r_inc in -1..=1 as isize {
+                    for c_inc in -1..=1 as isize {
+                        res += search_xmas_from_pos(&inputs, r_start, c_start, r_inc, c_inc) as u32;
+                    }
+                }
+            }
+        }
+
+        println!("D4P1: {res}");
+    }
+
+    fn search_x_mas_from_pos(inputs: &Vec<Vec<char>>, r: usize, c: usize) -> bool {
+        let ch_ul = inputs[r - 1][c - 1];
+        let ch_ur = inputs[r - 1][c + 1];
+        let ch_bl = inputs[r + 1][c - 1];
+        let ch_br = inputs[r + 1][c + 1];
+        check_pairs(ch_ul, ch_br) && check_pairs(ch_ur, ch_bl)
+    }
+
+    fn check_pairs(ch1: char, ch2: char) -> bool {
+        (ch1 == 'M' && ch2 == 'S') || (ch1 == 'S' && ch2 == 'M')
+    }
+
+    #[test]
+    fn part2() {
+        let inputs = load_inputs();
+
+        let mut res = 0;
+
+        for r in 1..inputs.len() - 1 {
+            for c in 1..inputs[0].len() - 1 {
+                res += (inputs[r][c] == 'A' && search_x_mas_from_pos(&inputs, r, c)) as u32;
+            }
+        }
+
+        println!("D4P2: {res}");
     }
 }
