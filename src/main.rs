@@ -133,3 +133,69 @@ mod day2 {
         println!("D2P2: {num_safe}");
     }
 }
+
+mod day3 {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader, Read};
+
+    fn load_inputs() -> String {
+        let mut buf = String::new();
+        let file = File::open("inputs/day3.txt")
+            .unwrap()
+            .read_to_string(&mut buf);
+        buf
+    }
+
+    fn find_mul(text: &str) -> Option<u32> {
+        let open_idx = text.find("(");
+        let close_idx = text.find(")");
+        if open_idx.is_none() || close_idx.is_none() || open_idx.is_some_and(|i| i != 0) {
+            return None;
+        }
+
+        let arg_str = &text[open_idx.unwrap() + 1..close_idx.unwrap()];
+        let args: Vec<&str> = arg_str.split(",").collect();
+        if args.len() != 2 {
+            return None;
+        }
+        let left = args[0];
+        let right = args[1];
+        if left.len() < 1 || 3 < left.len() || right.len() < 1 || 3 < right.len() {
+            return None;
+        }
+
+        if let Ok(left) = left.parse::<u32>() {
+            if let Ok(right) = right.parse::<u32>() {
+                return Some(left * right);
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn part1() {
+        let inputs = load_inputs();
+        let res: u32 = inputs.split("mul").filter_map(find_mul).sum();
+        println!("D3P1: {res}");
+    }
+
+    #[test]
+    fn part2() {
+        let inputs = load_inputs();
+        let res: u32 = inputs
+            .split("don't()")
+            .enumerate()
+            .filter_map(|(idx, s)| {
+                if idx == 0 {
+                    Some(s)
+                } else if let Some((_, s_enabled)) = s.split_once("do()") {
+                    Some(s_enabled)
+                } else {
+                    None
+                }
+            })
+            .flat_map(|s| s.split("mul").filter_map(find_mul))
+            .sum();
+        println!("D3P2: {res}");
+    }
+}
