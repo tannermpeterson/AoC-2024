@@ -413,3 +413,180 @@ mod day5 {
         println!("D5P2: {res}");
     }
 }
+
+mod day6 {
+    use std::collections::HashSet;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader, Write};
+
+    #[derive(Clone)]
+    enum TileState {
+        UNVISITED,
+        VISITED,
+        OBSTACLE,
+    }
+
+    const DIRS: [(isize, isize); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+
+    fn load_inputs() -> (Vec<Vec<TileState>>, (usize, usize)) {
+        let file = File::open("inputs/day6.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+
+        let mut starting_pos = (0, 0);
+        let tiles = buf_reader
+            .lines()
+            .enumerate()
+            .map(|(r, line)| {
+                line.unwrap()
+                    .chars()
+                    .enumerate()
+                    .map(|(c, ch)| match ch {
+                        '.' => TileState::UNVISITED,
+                        '#' => TileState::OBSTACLE,
+                        '^' => {
+                            starting_pos = (r, c);
+                            TileState::UNVISITED
+                        }
+                        bad_ch => panic!("invalid char: {bad_ch}"),
+                    })
+                    .collect()
+            })
+            .collect();
+
+        (tiles, starting_pos)
+    }
+
+    #[test]
+    fn part1() {
+        let (mut tiles, mut pos) = load_inputs();
+
+        let mut dir_idx = 0;
+        let mut dir = DIRS[dir_idx];
+
+        let mut count = 0;
+        while pos.0 < tiles.len() && pos.1 < tiles[0].len() {
+            let tile = &mut tiles[pos.0][pos.1];
+            match tile {
+                TileState::VISITED => {}
+                TileState::UNVISITED => {
+                    count += 1;
+                    *tile = TileState::VISITED;
+                }
+                TileState::OBSTACLE => {
+                    pos = (
+                        pos.0.wrapping_add_signed(-dir.0),
+                        pos.1.wrapping_add_signed(-dir.1),
+                    );
+                    dir_idx = (dir_idx + 1) % DIRS.len();
+                    dir = DIRS[dir_idx];
+                }
+            }
+            pos = (
+                pos.0.wrapping_add_signed(dir.0),
+                pos.1.wrapping_add_signed(dir.1),
+            );
+        }
+
+        println!("D6P1: {count}");
+    }
+
+    fn check_loop(
+        tiles: &Vec<Vec<(TileState, HashSet<(isize, isize)>)>>,
+        mut pos: (usize, usize),
+        mut dir_idx: usize,
+    ) -> bool {
+        let mut tiles: Vec<Vec<(TileState, HashSet<(isize, isize)>)>> = tiles
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|tile| (tile.0.clone(), tile.1.clone()))
+                    .collect()
+            })
+            .collect();
+
+        tiles[pos.0][pos.1].0 = TileState::OBSTACLE;
+
+        let mut dir = DIRS[dir_idx];
+
+        while pos.0 < tiles.len() && pos.1 < tiles[0].len() {
+            let tile = &mut tiles[pos.0][pos.1];
+            match tile.0 {
+                TileState::VISITED => {
+                    if tile.1.contains(&dir) {
+                        return true;
+                    }
+                    tile.1.insert(dir);
+                }
+                TileState::UNVISITED => {
+                    tile.0 = TileState::VISITED;
+                    tile.1.insert(dir);
+                }
+                TileState::OBSTACLE => {
+                    pos = (
+                        pos.0.wrapping_add_signed(-dir.0),
+                        pos.1.wrapping_add_signed(-dir.1),
+                    );
+                    dir_idx = (dir_idx + 1) % DIRS.len();
+                    dir = DIRS[dir_idx];
+                }
+            }
+            pos = (
+                pos.0.wrapping_add_signed(dir.0),
+                pos.1.wrapping_add_signed(dir.1),
+            );
+        }
+
+        false
+    }
+
+    #[test]
+    fn part2() {
+        // TODO find a way to speed this up. Might be a good oppurtunity to learn how to profile
+        // rust
+        let (tiles, starting_pos) = load_inputs();
+
+        let mut pos = starting_pos;
+
+        let mut dir_idx = 0;
+        let mut dir = DIRS[dir_idx];
+
+        let mut tiles: Vec<Vec<(TileState, HashSet<(isize, isize)>)>> = tiles
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|tile| (tile, HashSet::<(isize, isize)>::new()))
+                    .collect()
+            })
+            .collect();
+
+        let mut count = 0;
+        while pos.0 < tiles.len() && pos.1 < tiles[0].len() {
+            match tiles[pos.0][pos.1].0 {
+                TileState::VISITED => {
+                    tiles[pos.0][pos.1].1.insert(dir);
+                }
+                TileState::UNVISITED => {
+                    if pos != starting_pos {
+                        count += check_loop(&tiles, pos, dir_idx) as u32;
+                    }
+                    tiles[pos.0][pos.1].0 = TileState::VISITED;
+                    tiles[pos.0][pos.1].1.insert(dir);
+                }
+                TileState::OBSTACLE => {
+                    pos = (
+                        pos.0.wrapping_add_signed(-dir.0),
+                        pos.1.wrapping_add_signed(-dir.1),
+                    );
+                    dir_idx = (dir_idx + 1) % DIRS.len();
+                    dir = DIRS[dir_idx];
+                }
+            }
+            pos = (
+                pos.0.wrapping_add_signed(dir.0),
+                pos.1.wrapping_add_signed(dir.1),
+            );
+        }
+
+        println!("D6P2: {count}");
+    }
+}
