@@ -288,3 +288,128 @@ mod day4 {
         println!("D4P2: {res}");
     }
 }
+
+mod day5 {
+    use std::collections::{HashMap, HashSet};
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    fn load_inputs() -> (Vec<(u32, u32)>, Vec<Vec<u32>>) {
+        let file = File::open("inputs/day5a.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        let dependencies = buf_reader
+            .lines()
+            .map(|line| {
+                let line = line.unwrap();
+                let mut pairs = line.split("|");
+                (
+                    pairs.next().unwrap().parse::<u32>().unwrap(),
+                    pairs.next().unwrap().parse::<u32>().unwrap(),
+                )
+            })
+            .collect();
+
+        let file = File::open("inputs/day5b.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        let updates = buf_reader
+            .lines()
+            .map(|line| {
+                line.unwrap()
+                    .split(",")
+                    .map(|n| n.parse::<u32>().unwrap())
+                    .collect::<Vec<u32>>()
+            })
+            .collect();
+
+        (dependencies, updates)
+    }
+
+    fn create_dependency_mapping(dependency_pairs: &Vec<(u32, u32)>) -> HashMap<u32, HashSet<u32>> {
+        let mut dependency_map: HashMap<u32, HashSet<u32>> = HashMap::new();
+        for (first, second) in dependency_pairs {
+            dependency_map
+                .entry(*second)
+                .or_insert(HashSet::new())
+                .insert(*first);
+        }
+        dependency_map
+    }
+
+    fn is_update_valid(dependency_map: &mut HashMap<u32, HashSet<u32>>, pages: &[u32]) -> bool {
+        match pages {
+            [] => true,
+            [_] => true,
+            [curr, rest @ ..] => {
+                let dependencies = dependency_map.entry(*curr).or_default();
+                for page in rest {
+                    if dependencies.contains(page) {
+                        return false;
+                    }
+                }
+                is_update_valid(dependency_map, rest)
+            }
+        }
+    }
+
+    #[test]
+    fn part1() {
+        let (dependency_pairs, updates) = load_inputs();
+
+        let mut dependency_map = create_dependency_mapping(&dependency_pairs);
+
+        let res: u32 = updates
+            .iter()
+            .map(|update| {
+                if is_update_valid(&mut dependency_map, &update) {
+                    update[update.len() / 2]
+                } else {
+                    0
+                }
+            })
+            .sum();
+
+        println!("D5P1: {res}");
+    }
+
+    fn fix_update(dependency_map: &mut HashMap<u32, HashSet<u32>>, pages: &mut [u32]) {
+        let mut curr_idx = 0;
+        while curr_idx < pages.len() - 1 {
+            let curr = pages[curr_idx];
+            let dependencies = dependency_map.entry(curr).or_default();
+            let mut new_idx = 0;
+            for (idx, page) in pages[curr_idx..].iter().enumerate() {
+                if dependencies.contains(page) {
+                    new_idx = idx + curr_idx;
+                }
+            }
+            if new_idx > curr_idx {
+                for next_idx in curr_idx + 1..=new_idx {
+                    pages.swap(next_idx - 1, next_idx);
+                }
+            } else {
+                curr_idx += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn part2() {
+        let (dependency_pairs, updates) = load_inputs();
+
+        let mut dependency_map = create_dependency_mapping(&dependency_pairs);
+
+        let res: u32 = updates
+            .into_iter()
+            .map(|mut update| {
+                if is_update_valid(&mut dependency_map, &update) {
+                    0
+                } else {
+                    fix_update(&mut dependency_map, &mut update);
+                    update[update.len() / 2]
+                }
+            })
+            .sum();
+
+        println!("D5P2: {res}");
+    }
+}

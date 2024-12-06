@@ -1,2 +1,3 @@
 /target
 /inputs/*.txt
+.DS_Store
