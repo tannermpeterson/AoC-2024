@@ -491,35 +491,29 @@ mod day6 {
     }
 
     fn check_loop(
-        tiles: &Vec<Vec<(TileState, HashSet<(isize, isize)>)>>,
+        tiles: &Vec<Vec<(TileState, u8)>>,
         mut pos: (usize, usize),
         mut dir_idx: usize,
     ) -> bool {
-        let mut tiles: Vec<Vec<(TileState, HashSet<(isize, isize)>)>> = tiles
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|tile| (tile.0.clone(), tile.1.clone()))
-                    .collect()
-            })
-            .collect();
+        let mut tiles = tiles.clone();
 
         tiles[pos.0][pos.1].0 = TileState::OBSTACLE;
 
         let mut dir = DIRS[dir_idx];
+        let mut dir_mask = 1 << dir_idx;
 
         while pos.0 < tiles.len() && pos.1 < tiles[0].len() {
             let tile = &mut tiles[pos.0][pos.1];
             match tile.0 {
                 TileState::VISITED => {
-                    if tile.1.contains(&dir) {
+                    if tile.1 & dir_mask > 0 {
                         return true;
                     }
-                    tile.1.insert(dir);
+                    tile.1 |= dir_mask;
                 }
                 TileState::UNVISITED => {
                     tile.0 = TileState::VISITED;
-                    tile.1.insert(dir);
+                    tile.1 |= dir_mask;
                 }
                 TileState::OBSTACLE => {
                     pos = (
@@ -528,6 +522,7 @@ mod day6 {
                     );
                     dir_idx = (dir_idx + 1) % DIRS.len();
                     dir = DIRS[dir_idx];
+                    dir_mask = 1 << dir_idx;
                 }
             }
             pos = (
@@ -541,8 +536,6 @@ mod day6 {
 
     #[test]
     fn part2() {
-        // TODO find a way to speed this up. Might be a good oppurtunity to learn how to profile
-        // rust
         let (tiles, starting_pos) = load_inputs();
 
         let mut pos = starting_pos;
@@ -550,27 +543,23 @@ mod day6 {
         let mut dir_idx = 0;
         let mut dir = DIRS[dir_idx];
 
-        let mut tiles: Vec<Vec<(TileState, HashSet<(isize, isize)>)>> = tiles
+        let mut tiles: Vec<Vec<(TileState, u8)>> = tiles
             .into_iter()
-            .map(|row| {
-                row.into_iter()
-                    .map(|tile| (tile, HashSet::<(isize, isize)>::new()))
-                    .collect()
-            })
+            .map(|row| row.into_iter().map(|tile| (tile, 0)).collect())
             .collect();
 
         let mut count = 0;
         while pos.0 < tiles.len() && pos.1 < tiles[0].len() {
             match tiles[pos.0][pos.1].0 {
                 TileState::VISITED => {
-                    tiles[pos.0][pos.1].1.insert(dir);
+                    tiles[pos.0][pos.1].1 |= 1 << dir_idx;
                 }
                 TileState::UNVISITED => {
                     if pos != starting_pos {
                         count += check_loop(&tiles, pos, dir_idx) as u32;
                     }
                     tiles[pos.0][pos.1].0 = TileState::VISITED;
-                    tiles[pos.0][pos.1].1.insert(dir);
+                    tiles[pos.0][pos.1].1 |= 1 << dir_idx;
                 }
                 TileState::OBSTACLE => {
                     pos = (
