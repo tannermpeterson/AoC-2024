@@ -415,9 +415,9 @@ mod day5 {
 }
 
 mod day6 {
-    use std::collections::HashSet;
+    use std::borrow::Cow;
     use std::fs::File;
-    use std::io::{BufRead, BufReader, Write};
+    use std::io::{BufRead, BufReader};
 
     #[derive(Clone)]
     enum TileState {
@@ -495,15 +495,16 @@ mod day6 {
         mut pos: (usize, usize),
         mut dir_idx: usize,
     ) -> bool {
-        let mut tiles = tiles.clone();
+        let mut tiles: Vec<Cow<Vec<(TileState, u8)>>> =
+            tiles.iter().map(|row| Cow::Borrowed(row)).collect();
 
-        tiles[pos.0][pos.1].0 = TileState::OBSTACLE;
+        tiles[pos.0].to_mut()[pos.1].0 = TileState::OBSTACLE;
 
         let mut dir = DIRS[dir_idx];
         let mut dir_mask = 1 << dir_idx;
 
         while pos.0 < tiles.len() && pos.1 < tiles[0].len() {
-            let tile = &mut tiles[pos.0][pos.1];
+            let tile = &mut tiles[pos.0].to_mut()[pos.1];
             match tile.0 {
                 TileState::VISITED => {
                     if tile.1 & dir_mask > 0 {
