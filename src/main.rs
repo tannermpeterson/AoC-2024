@@ -1,6 +1,4 @@
-fn main() {
-    println!("Hello, world!");
-}
+fn main() {}
 
 mod day1 {
     use std::fs::File;
@@ -578,5 +576,93 @@ mod day6 {
         }
 
         println!("D6P2: {count}");
+    }
+}
+
+mod day7 {
+    use std::cmp;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    fn load_inputs() -> Vec<(Vec<u64>, u64)> {
+        let file = File::open("inputs/day7.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        let in_out = buf_reader
+            .lines()
+            .map(|line| {
+                let line = line.unwrap();
+                let spl: Vec<&str> = line.split(": ").collect();
+                let ins: Vec<u64> = spl[1]
+                    .split(" ")
+                    .map(|nstr| nstr.parse().unwrap())
+                    .collect();
+                let out: u64 = spl[0].parse().unwrap();
+                (ins, out)
+            })
+            .collect();
+
+        in_out
+    }
+
+    fn check_test(ins: &Vec<u64>, out: u64, concat: bool) -> bool {
+        _check_test(ins, out, concat, 0)
+    }
+
+    fn _check_test(ins: &[u64], out: u64, concat: bool, total: u64) -> bool {
+        if total > out {
+            false
+        } else if ins.len() == 0 {
+            total == out
+        } else {
+            _check_test(&ins[1..], out, concat, total + ins[0])
+                || _check_test(&ins[1..], out, concat, total * ins[0])
+                || (concat && _check_test(&ins[1..], out, concat, _concat(total, ins[0])))
+        }
+    }
+
+    fn _concat(total: u64, next: u64) -> u64 {
+        let mut spacer = 1;
+        while next >= spacer {
+            spacer *= 10;
+        }
+        total * spacer + next
+    }
+
+    #[test]
+    fn part1() {
+        let in_out = load_inputs();
+
+        let res: u64 = in_out
+            .iter()
+            .map(|(ins, out)| {
+                if check_test(ins, *out, false) {
+                    *out
+                } else {
+                    0
+                }
+            })
+            .sum();
+
+        println!("D7P1: {res}");
+    }
+
+    #[test]
+    fn part2() {
+        let in_out = load_inputs();
+
+        let res: u64 = in_out
+            .iter()
+            .map(
+                |(ins, out)| {
+                    if check_test(ins, *out, true) {
+                        *out
+                    } else {
+                        0
+                    }
+                },
+            )
+            .sum();
+
+        println!("D7P2: {res}");
     }
 }
