@@ -580,7 +580,6 @@ mod day6 {
 }
 
 mod day7 {
-    use std::cmp;
     use std::fs::File;
     use std::io::{BufRead, BufReader};
 
@@ -664,5 +663,107 @@ mod day7 {
             .sum();
 
         println!("D7P2: {res}");
+    }
+}
+
+mod day8 {
+    use std::collections::{HashMap, HashSet};
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    fn load_inputs() -> (HashMap<char, Vec<(usize, usize)>>, (usize, usize)) {
+        let file = File::open("inputs/day8.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+
+        let mut freq_to_locs: HashMap<char, Vec<(usize, usize)>> = HashMap::new();
+
+        let mut rows = 0;
+        let mut cols = 0;
+
+        for (r, line) in buf_reader.lines().enumerate() {
+            rows = r + 1;
+            for (c, ch) in line.unwrap().chars().enumerate() {
+                cols = c + 1;
+                if ch != '.' {
+                    freq_to_locs.entry(ch).or_default().push((r, c));
+                }
+            }
+        }
+
+        (freq_to_locs, (rows, cols))
+    }
+
+    #[test]
+    fn part1() {
+        let (freq_to_locs, bounds) = load_inputs();
+
+        let mut antinodes: HashSet<(usize, usize)> = HashSet::new();
+
+        for (_, locs) in freq_to_locs {
+            for (first_idx, pos1) in locs.iter().enumerate() {
+                for pos2 in &locs[first_idx + 1..] {
+                    let diff = (
+                        pos2.0 as isize - pos1.0 as isize,
+                        pos2.1 as isize - pos1.1 as isize,
+                    );
+                    let antinode_loc = (
+                        pos1.0.wrapping_add_signed(-diff.0),
+                        pos1.1.wrapping_add_signed(-diff.1),
+                    );
+                    if antinode_loc.0 < bounds.0 && antinode_loc.1 < bounds.1 {
+                        antinodes.insert(antinode_loc);
+                    }
+                    let antinode_loc = (
+                        pos2.0.wrapping_add_signed(diff.0),
+                        pos2.1.wrapping_add_signed(diff.1),
+                    );
+                    if antinode_loc.0 < bounds.0 && antinode_loc.1 < bounds.1 {
+                        antinodes.insert(antinode_loc);
+                    }
+                }
+            }
+        }
+
+        let res = antinodes.len();
+
+        println!("D8P1: {res}");
+    }
+
+    #[test]
+    fn part2() {
+        let (freq_to_locs, bounds) = load_inputs();
+
+        let mut antinodes: HashSet<(usize, usize)> = HashSet::new();
+
+        for (_, locs) in freq_to_locs {
+            for (first_idx, pos1) in locs.iter().enumerate() {
+                for pos2 in &locs[first_idx + 1..] {
+                    let diff = (
+                        pos2.0 as isize - pos1.0 as isize,
+                        pos2.1 as isize - pos1.1 as isize,
+                    );
+                    let mut antinode_loc = *pos1;
+                    while antinode_loc.0 < bounds.0 && antinode_loc.1 < bounds.1 {
+                        antinodes.insert(antinode_loc);
+                        antinode_loc = (
+                            antinode_loc.0.wrapping_add_signed(-diff.0),
+                            antinode_loc.1.wrapping_add_signed(-diff.1),
+                        );
+                    }
+                    let mut antinode_loc = *pos2;
+                    while antinode_loc.0 < bounds.0 && antinode_loc.1 < bounds.1 {
+                        antinodes.insert(antinode_loc);
+                        antinode_loc = (
+                            antinode_loc.0.wrapping_add_signed(diff.0),
+                            antinode_loc.1.wrapping_add_signed(diff.1),
+                        );
+                    }
+                }
+            }
+        }
+
+        let res = antinodes.len();
+
+        println!("D8P2: {res}");
     }
 }
