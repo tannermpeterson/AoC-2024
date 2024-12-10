@@ -771,16 +771,7 @@ mod day8 {
 mod day9 {
     fn load_inputs() -> Vec<u32> {
         let input = include_str!("../inputs/day9.txt");
-        input
-            .chars()
-            .filter_map(|ch| {
-                if let Some(n) = ch.to_digit(10) {
-                    Some(n)
-                } else {
-                    None
-                }
-            })
-            .collect()
+        input.chars().filter_map(|ch| ch.to_digit(10)).collect()
     }
 
     #[test]
@@ -839,47 +830,43 @@ mod day9 {
     #[test]
     fn part2() {
         let input = load_inputs();
-        let mut disk: Vec<(Option<u32>, i32, bool)> = input
-            .iter()
-            .enumerate()
-            .map(|(idx, n)| {
-                let n = *n as i32;
-                if idx % 2 == 0 {
-                    (Some(idx as u32 / 2), n, false)
-                } else {
-                    (None, n, false)
-                }
-            })
-            .collect();
 
-        let mut back_idx = disk.len() - 1;
-        while back_idx > 1 {
-            let mut decrement = true;
-            if disk[back_idx].0.is_some() {
-                for front_idx in 1..back_idx {
-                    let diff = disk[front_idx].1 - disk[back_idx].1;
-                    if disk[front_idx].0.is_none() && diff >= 0 && !disk[back_idx].2 {
-                        disk[back_idx].2 = true;
-                        disk[front_idx].1 = disk[back_idx].1;
-                        disk.swap(front_idx, back_idx);
-                        decrement = diff == 0;
-                        if !decrement {
-                            disk.insert(front_idx + 1, (None, diff, false));
-                        }
-                        break;
-                    }
-                }
+        let mut index = 0;
+        let mut file_chunks: Vec<(u32, u32, u32)> = Vec::new();
+        let mut empty_chunks: Vec<(u32, u32)> = Vec::new();
+        for (idx, size) in input.iter().enumerate() {
+            let size = *size as u32;
+            if idx % 2 == 0 {
+                let id = idx as u32 / 2;
+                file_chunks.push((index, size, id));
+            } else {
+                empty_chunks.push((index, size));
             }
-            if decrement {
-                back_idx -= 1;
+            index += size;
+        }
+
+        for file_chunk in file_chunks.iter_mut().rev() {
+            for empty_chunk in &mut empty_chunks {
+                if empty_chunk.0 >= file_chunk.0 {
+                    break;
+                } else if empty_chunk.1 >= file_chunk.1 {
+                    file_chunk.0 = empty_chunk.0;
+                    empty_chunk.0 += file_chunk.1;
+                    empty_chunk.1 -= file_chunk.1;
+                    break;
+                }
             }
         }
 
-        let res: u64 = disk
+        let res: u64 = file_chunks
             .iter()
-            .flat_map(|(n, count, _)| vec![n.unwrap_or(0); *count as usize])
-            .enumerate()
-            .map(|(idx, n)| (idx as u32 * n) as u64)
+            .map(|(index, size, id)| {
+                let mut res = 0;
+                for inc in 0..*size {
+                    res += (index + inc) * id;
+                }
+                res as u64
+            })
             .sum();
 
         println!("D9P2: {res}");
