@@ -862,8 +862,10 @@ mod day9 {
                         disk[back_idx].2 = true;
                         disk[front_idx].1 = disk[back_idx].1;
                         disk.swap(front_idx, back_idx);
-                        disk.insert(front_idx + 1, (None, diff, false));
-                        decrement = false;
+                        decrement = diff == 0;
+                        if !decrement {
+                            disk.insert(front_idx + 1, (None, diff, false));
+                        }
                         break;
                     }
                 }
