@@ -767,3 +767,119 @@ mod day8 {
         println!("D8P2: {res}");
     }
 }
+
+mod day9 {
+    fn load_inputs() -> Vec<u32> {
+        let input = include_str!("../inputs/day9.txt");
+        input
+            .chars()
+            .filter_map(|ch| {
+                if let Some(n) = ch.to_digit(10) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn part1() {
+        let input = load_inputs();
+        let input: Vec<Option<u32>> = input
+            .iter()
+            .enumerate()
+            .flat_map(|(idx, n)| {
+                let n = *n as usize;
+                if idx % 2 == 0 {
+                    vec![Some(idx as u32 / 2); n]
+                } else {
+                    vec![None; n]
+                }
+            })
+            .collect();
+
+        let mut input = input.iter();
+        let mut front_next = input.next();
+        let mut back_next = input.next_back();
+
+        let mut compacted: Vec<u32> = Vec::new();
+        while front_next.is_some() && back_next.is_some() {
+            let front = front_next.unwrap();
+            let back = back_next.unwrap();
+            match front {
+                Some(front) => {
+                    compacted.push(*front);
+                    front_next = input.next();
+                }
+                None => {
+                    if let Some(back) = back {
+                        compacted.push(*back);
+                        front_next = input.next();
+                    }
+                    back_next = input.next_back();
+                }
+            };
+        }
+        if let Some(Some(front)) = front_next {
+            compacted.push(*front);
+        } else if let Some(Some(back)) = back_next {
+            compacted.push(*back);
+        }
+
+        let res: u64 = compacted
+            .iter()
+            .enumerate()
+            .map(|(idx, n)| (idx as u32 * n) as u64)
+            .sum();
+
+        println!("D9P1: {res}");
+    }
+
+    #[test]
+    fn part2() {
+        let input = load_inputs();
+        let mut disk: Vec<(Option<u32>, i32, bool)> = input
+            .iter()
+            .enumerate()
+            .map(|(idx, n)| {
+                let n = *n as i32;
+                if idx % 2 == 0 {
+                    (Some(idx as u32 / 2), n, false)
+                } else {
+                    (None, n, false)
+                }
+            })
+            .collect();
+
+        let mut back_idx = disk.len() - 1;
+        while back_idx > 1 {
+            let mut decrement = true;
+            if disk[back_idx].0.is_some() {
+                for front_idx in 1..back_idx {
+                    let diff = disk[front_idx].1 - disk[back_idx].1;
+                    if disk[front_idx].0.is_none() && diff >= 0 && !disk[back_idx].2 {
+                        disk[back_idx].2 = true;
+                        disk[front_idx].1 = disk[back_idx].1;
+                        disk.swap(front_idx, back_idx);
+                        disk.insert(front_idx + 1, (None, diff, false));
+                        decrement = false;
+                        break;
+                    }
+                }
+            }
+            if decrement {
+                back_idx -= 1;
+            }
+        }
+
+        let res: u64 = disk
+            .iter()
+            .flat_map(|(n, count, _)| vec![n.unwrap_or(0); *count as usize])
+            .enumerate()
+            .map(|(idx, n)| (idx as u32 * n) as u64)
+            .sum();
+
+        println!("D9P2: {res}");
+    }
+}
