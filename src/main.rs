@@ -872,3 +872,141 @@ mod day9 {
         println!("D9P2: {res}");
     }
 }
+
+mod day10 {
+    use rtrb::RingBuffer;
+    use std::{
+        collections::{HashMap, HashSet},
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    const DIRS: [(isize, isize); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+
+    fn load_inputs() -> Vec<Vec<u32>> {
+        let file = File::open("inputs/day10.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        buf_reader
+            .lines()
+            .map(|line| {
+                line.unwrap()
+                    .chars()
+                    .map(|ch| ch.to_digit(10).unwrap())
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn find_score(topo: &Vec<Vec<u32>>, r_start: usize, c_start: usize) -> u64 {
+        let max_r = topo.len();
+        let max_c = topo[0].len();
+
+        let mut ends: HashSet<(usize, usize, u32)> = HashSet::new();
+        let mut checked_tiles: HashSet<(usize, usize, u32)> = HashSet::new();
+
+        let (mut producer, mut consumer) = RingBuffer::new(300);
+        producer
+            .push((r_start, c_start, 0))
+            .expect("failed to push to rb");
+
+        while !consumer.is_empty() {
+            let curr = consumer.pop().unwrap();
+            if checked_tiles.contains(&curr) {
+                continue;
+            }
+            checked_tiles.insert(curr);
+            if curr.2 == 9 {
+                ends.insert(curr);
+                continue;
+            } else {
+                for dir in DIRS {
+                    let r_next = curr.0.wrapping_add_signed(dir.0);
+                    let c_next = curr.1.wrapping_add_signed(dir.1);
+                    if r_next < max_r && c_next < max_c {
+                        let val = topo[r_next][c_next];
+                        if val == curr.2 + 1 {
+                            producer
+                                .push((r_next, c_next, val))
+                                .expect("failed to push to rb");
+                        }
+                    }
+                }
+            }
+        }
+
+        ends.len() as u64
+    }
+
+    #[test]
+    fn part1() {
+        let topo = load_inputs();
+
+        let res: u64 = topo
+            .iter()
+            .enumerate()
+            .map(|(r, row)| {
+                row.iter()
+                    .enumerate()
+                    .map(|(c, n)| if *n == 0 { find_score(&topo, r, c) } else { 0 })
+                    .sum::<u64>()
+            })
+            .sum();
+
+        println!("D10P1: {res}");
+    }
+
+    fn find_rating(topo: &Vec<Vec<u32>>, r_start: usize, c_start: usize) -> u64 {
+        let max_r = topo.len();
+        let max_c = topo[0].len();
+
+        let mut ends: HashMap<(usize, usize, u32), u64> = HashMap::new();
+        // TODO could try adding checked_tiles, need to count the number of paths to that tiles
+        // correctly though
+
+        let (mut producer, mut consumer) = RingBuffer::new(300);
+        producer
+            .push((r_start, c_start, 0))
+            .expect("failed to push to rb");
+
+        while !consumer.is_empty() {
+            let curr = consumer.pop().unwrap();
+            if curr.2 == 9 {
+                *ends.entry(curr).or_insert(0) += 1;
+                continue;
+            } else {
+                for dir in DIRS {
+                    let r_next = curr.0.wrapping_add_signed(dir.0);
+                    let c_next = curr.1.wrapping_add_signed(dir.1);
+                    if r_next < max_r && c_next < max_c {
+                        let val = topo[r_next][c_next];
+                        if val == curr.2 + 1 {
+                            producer
+                                .push((r_next, c_next, val))
+                                .expect("failed to push to rb");
+                        }
+                    }
+                }
+            }
+        }
+
+        ends.values().sum()
+    }
+
+    #[test]
+    fn part2() {
+        let topo = load_inputs();
+
+        let res: u64 = topo
+            .iter()
+            .enumerate()
+            .map(|(r, row)| {
+                row.iter()
+                    .enumerate()
+                    .map(|(c, n)| if *n == 0 { find_rating(&topo, r, c) } else { 0 })
+                    .sum::<u64>()
+            })
+            .sum();
+
+        println!("D10P2: {res}");
+    }
+}

@@ -5,3 +5,12 @@ version = 3
 [[package]]
 name = "aoc-2024"
 version = "0.1.0"
+dependencies = [
+ "rtrb",
+]
+
+[[package]]
+name = "rtrb"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3f94e84c073f3b85d4012b44722fa8842b9986d741590d4f2636ad0a5b14143"
