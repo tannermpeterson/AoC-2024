@@ -1010,3 +1010,59 @@ mod day10 {
         println!("D10P2: {res}");
     }
 }
+
+mod day11 {
+    use std::collections::HashMap;
+
+    fn load_inputs() -> Vec<u64> {
+        include_str!("../inputs/day11.txt")
+            .trim()
+            .split(" ")
+            .filter_map(|s| s.parse().ok())
+            .collect()
+    }
+
+    fn blink(n: u64, remaining: u64, lut: &mut HashMap<(u64, u64), u64>) -> u64 {
+        if remaining <= 0 {
+            return 1;
+        } else if let Some(res) = lut.get(&(n, remaining)) {
+            *res
+        } else {
+            let res = if n == 0 {
+                blink(1, remaining - 1, lut)
+            } else {
+                let n_str = format!("{}", n);
+                if n_str.len() % 2 == 0 {
+                    let (nl, nr) = n_str.split_at(n_str.len() / 2);
+                    blink(nl.parse().unwrap(), remaining - 1, lut)
+                        + blink(nr.parse().unwrap(), remaining - 1, lut)
+                } else {
+                    blink(n * 2024, remaining - 1, lut)
+                }
+            };
+            lut.insert((n, remaining), res);
+            res
+        }
+    }
+
+    #[test]
+    fn part1() {
+        let inputs = load_inputs();
+
+        let mut lut = HashMap::new();
+        let res: u64 = inputs.iter().map(|n| blink(*n, 25, &mut lut)).sum();
+
+        println!("D11P1: {res}");
+    }
+
+    #[test]
+    fn part2() {
+        let inputs = load_inputs();
+
+        let mut lut = HashMap::new();
+
+        let res: u64 = inputs.iter().map(|n| blink(*n, 75, &mut lut)).sum();
+
+        println!("D11P2: {res}");
+    }
+}
