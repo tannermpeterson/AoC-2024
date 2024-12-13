@@ -1066,3 +1066,210 @@ mod day11 {
         println!("D11P2: {res}");
     }
 }
+
+mod day12 {
+    use rtrb::RingBuffer;
+    use std::{
+        collections::{HashMap, HashSet},
+        fs::File,
+        io::{BufRead, BufReader},
+        ops::RangeFrom,
+    };
+
+    const DIRS: [(isize, isize); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+
+    fn load_inputs() -> Vec<Vec<(char, bool, Vec<u32>)>> {
+        let file = File::open("inputs/day12.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        buf_reader
+            .lines()
+            .map(|line| {
+                line.unwrap()
+                    .chars()
+                    .map(|ch| (ch, false, Vec::new()))
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn check_area_by_perimeter(
+        tiles: &mut Vec<Vec<(char, bool, Vec<u32>)>>,
+        r_start: usize,
+        c_start: usize,
+    ) -> u32 {
+        if tiles[r_start][c_start].1 {
+            return 0;
+        }
+
+        let r_len = tiles.len();
+        let c_len = tiles[0].len();
+
+        let (mut producer, mut consumer) = RingBuffer::new(300);
+        producer
+            .push((r_start, c_start))
+            .expect("failed to push to rb");
+
+        let mut area = 0;
+        let mut perimeter = 0;
+
+        while !consumer.is_empty() {
+            let (r, c) = consumer.pop().unwrap();
+            let tile_id = {
+                let tile = &mut tiles[r][c];
+                if tile.1 {
+                    continue;
+                }
+                tile.1 = true;
+                tile.0
+            };
+            area += 1;
+            for dir in DIRS {
+                let r_test = r.wrapping_add_signed(dir.0);
+                let c_test = c.wrapping_add_signed(dir.1);
+                if r_test >= r_len || c_test >= c_len || tiles[r_test][c_test].0 != tile_id {
+                    perimeter += 1;
+                } else {
+                    producer
+                        .push((r_test, c_test))
+                        .expect("failed to push to rb");
+                }
+            }
+        }
+
+        area * perimeter
+    }
+
+    #[test]
+    fn part1() {
+        let mut tiles = load_inputs();
+
+        let mut price = 0;
+        for r in 0..tiles.len() {
+            for c in 0..tiles[0].len() {
+                price += check_area_by_perimeter(&mut tiles, r, c);
+            }
+        }
+
+        println!("D12P1: {price}");
+    }
+
+    fn check_area_by_num_sides(
+        tiles: &mut Vec<Vec<(char, bool, Vec<u32>)>>,
+        r_start: usize,
+        c_start: usize,
+    ) -> u32 {
+        if tiles[r_start][c_start].1 {
+            return 0;
+        }
+
+        let r_len = tiles.len();
+        let c_len = tiles[0].len();
+
+        let (mut producer, mut consumer) = RingBuffer::new(300);
+        producer
+            .push((r_start, c_start))
+            .expect("failed to push to rb");
+
+        let mut area = 0;
+        let mut side_ids: HashSet<u32> = HashSet::new();
+
+        while !consumer.is_empty() {
+            let (r, c) = consumer.pop().unwrap();
+            let tile_id = {
+                let tile = &mut tiles[r][c];
+                if tile.1 {
+                    continue;
+                }
+                tile.1 = true;
+                side_ids.extend(&tile.2);
+                tile.0
+            };
+            area += 1;
+            for dir in DIRS {
+                let r_test = r.wrapping_add_signed(dir.0);
+                let c_test = c.wrapping_add_signed(dir.1);
+                if r_test < r_len && c_test < c_len && tiles[r_test][c_test].0 == tile_id {
+                    producer
+                        .push((r_test, c_test))
+                        .expect("failed to push to rb");
+                }
+            }
+        }
+
+        let num_sides = side_ids.len() as u32;
+
+        area * num_sides
+    }
+
+    fn update_tiles(
+        coord: (usize, usize),
+        coord_test: (usize, usize),
+        tiles: &mut Vec<Vec<(char, bool, Vec<u32>)>>,
+        side_id: &mut Option<u32>,
+        side_ids: &mut RangeFrom<u32>,
+    ) {
+        if coord_test.0 >= tiles.len()
+            || coord_test.1 >= tiles[0].len()
+            || tiles[coord_test.0][coord_test.1].0 != tiles[coord.0][coord.1].0
+        {
+            if side_id.is_none() {
+                *side_id = Some(side_ids.next().unwrap());
+            }
+            tiles[coord.0][coord.1].2.push(side_id.unwrap());
+        } else {
+            *side_id = None;
+        }
+    }
+
+    #[test]
+    fn part2() {
+        let mut tiles = load_inputs();
+
+        let r_len = tiles.len();
+        let c_len = tiles[0].len();
+
+        let mut prev_id = '.';
+
+        let mut side_ids = 0..;
+        for r in 0..r_len {
+            let r_u = r.wrapping_add_signed(-1);
+            let r_d = r.wrapping_add_signed(1);
+            let mut u_id: Option<u32> = None;
+            let mut d_id: Option<u32> = None;
+            for c in 0..c_len {
+                if tiles[r][c].0 != prev_id {
+                    u_id = None;
+                    d_id = None;
+                }
+                update_tiles((r, c), (r_u, c), &mut tiles, &mut u_id, &mut side_ids);
+                update_tiles((r, c), (r_d, c), &mut tiles, &mut d_id, &mut side_ids);
+                prev_id = tiles[r][c].0;
+            }
+        }
+        prev_id = '.';
+        for c in 0..c_len {
+            let c_l = c.wrapping_add_signed(-1);
+            let c_r = c.wrapping_add_signed(1);
+            let mut l_id: Option<u32> = None;
+            let mut r_id: Option<u32> = None;
+            for r in 0..r_len {
+                if tiles[r][c].0 != prev_id {
+                    l_id = None;
+                    r_id = None;
+                }
+                update_tiles((r, c), (r, c_l), &mut tiles, &mut r_id, &mut side_ids);
+                update_tiles((r, c), (r, c_r), &mut tiles, &mut l_id, &mut side_ids);
+                prev_id = tiles[r][c].0;
+            }
+        }
+
+        let mut price = 0;
+        for r in 0..tiles.len() {
+            for c in 0..tiles[0].len() {
+                price += check_area_by_num_sides(&mut tiles, r, c);
+            }
+        }
+
+        println!("D12P2: {price}");
+    }
+}
