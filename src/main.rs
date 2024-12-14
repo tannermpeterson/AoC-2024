@@ -1273,3 +1273,137 @@ mod day12 {
         println!("D12P2: {price}");
     }
 }
+
+mod day13 {
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader},
+        ops::Sub,
+    };
+
+    #[derive(PartialEq, PartialOrd, Clone, Copy)]
+    struct Point {
+        x: i64,
+        y: i64,
+    }
+
+    impl Point {
+        fn new(x: i64, y: i64) -> Self {
+            Self { x, y }
+        }
+    }
+
+    impl Sub for Point {
+        type Output = Self;
+
+        fn sub(self, other: Self) -> Self::Output {
+            Self {
+                x: self.x - other.x,
+                y: self.y - other.y,
+            }
+        }
+    }
+
+    fn min(n1: u64, n2: u64) -> u64 {
+        if n1 < n2 {
+            n1
+        } else {
+            n2
+        }
+    }
+
+    fn load_inputs() -> Vec<(Point, Point, Point)> {
+        let file = File::open("inputs/day13.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        let mut buf_reader_lines = buf_reader.lines().peekable();
+
+        let mut machines = Vec::new();
+
+        while buf_reader_lines.peek().is_some() {
+            machines.push((
+                get_point(&buf_reader_lines.next().unwrap().unwrap()),
+                get_point(&buf_reader_lines.next().unwrap().unwrap()),
+                get_point(&buf_reader_lines.next().unwrap().unwrap()),
+            ));
+            buf_reader_lines.next();
+        }
+
+        machines
+    }
+
+    fn get_point(s: &str) -> Point {
+        let s = s.rsplit_once(": ").unwrap().1.trim();
+        let splitter = if s.contains("+") { "+" } else { "=" };
+        let (xs, ys) = s.rsplit_once(", ").unwrap();
+        let x = xs.rsplit_once(splitter).unwrap().1.parse().unwrap();
+        let y = ys.rsplit_once(splitter).unwrap().1.parse().unwrap();
+        Point::new(x, y)
+    }
+
+    fn check_machine1(a: Point, b: Point, target: Point) -> Option<u64> {
+        let mut a_count = 0;
+        let mut test = target;
+        while test > Point::new(0, 0) {
+            if test.x % b.x == 0 && test.y % b.y == 0 {
+                let b_count = test.x / b.x;
+                let b_count_check = test.y / b.y;
+                if b_count == b_count_check {
+                    let test_min = (a_count * 3 + b_count) as u64;
+                    return Some(test_min);
+                }
+            }
+            a_count += 1;
+            test = test - a;
+        }
+
+        None
+    }
+
+    #[test]
+    fn part1() {
+        let inputs = load_inputs();
+
+        let res: u64 = inputs
+            .iter()
+            .map(|(a, b, target)| check_machine1(*a, *b, *target).unwrap_or(0))
+            .sum();
+
+        println!("D13P1: {res}");
+    }
+
+    fn check_machine2(a: Point, b: Point, target: Point) -> Option<u64> {
+        let target = Point::new(target.x + 10000000000000, target.y + 10000000000000);
+
+        let a_x = a.x as f64;
+        let a_y = a.y as f64;
+        let b_x = b.x as f64;
+        let b_y = b.y as f64;
+        let t_x = target.x as f64;
+        let t_y = target.y as f64;
+
+        let b_count = ((t_y - a_y * t_x / a_x) / (b_y - a_y * b_x / a_x)).round() as i64;
+        let a_count = ((t_x - b_x * b_count as f64) / a_x).round() as i64;
+
+        if (a.x * a_count + b.x * b_count == target.x)
+            && (a.y * a_count + b.y * b_count == target.y)
+            && a_count > 0
+            && b_count > 0
+        {
+            Some((a_count * 3 + b_count) as u64)
+        } else {
+            None
+        }
+    }
+
+    #[test]
+    fn part2() {
+        let inputs = load_inputs();
+
+        let res: u64 = inputs
+            .iter()
+            .map(|(a, b, target)| check_machine2(*a, *b, *target).unwrap_or(0))
+            .sum();
+
+        println!("D13P2: {res}");
+    }
+}
