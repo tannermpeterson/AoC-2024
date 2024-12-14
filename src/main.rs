@@ -1407,3 +1407,155 @@ mod day13 {
         println!("D13P2: {res}");
     }
 }
+
+mod day14 {
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader},
+        ops::{Add, Mul},
+        thread::sleep,
+        time::Duration,
+    };
+
+    const X: u64 = 101;
+    const Y: u64 = 103;
+
+    #[derive(Copy, Clone, Debug)]
+    struct Point {
+        x: i64,
+        y: i64,
+    }
+
+    impl Point {
+        fn new(x: i64, y: i64) -> Self {
+            Self { x, y }
+        }
+    }
+
+    impl Add<Velocity> for Point {
+        type Output = Self;
+        fn add(self, rhs: Velocity) -> Self::Output {
+            let x = X as i64;
+            let y = Y as i64;
+            let mut added = Self::new((self.x + (rhs.x % x)) % x, (self.y + (rhs.y % y)) % y);
+            if added.x < 0 {
+                added.x = x + added.x;
+            }
+            if added.y < 0 {
+                added.y = y + added.y;
+            }
+            added
+        }
+    }
+
+    #[derive(PartialEq, PartialOrd, Clone, Copy)]
+    struct Velocity {
+        x: i64,
+        y: i64,
+    }
+
+    impl Velocity {
+        fn new(x: i64, y: i64) -> Self {
+            Self { x, y }
+        }
+    }
+
+    impl Mul<i64> for Velocity {
+        type Output = Self;
+        fn mul(self, rhs: i64) -> Self::Output {
+            Self {
+                x: self.x * rhs,
+                y: self.y * rhs,
+            }
+        }
+    }
+
+    fn load_inputs() -> Vec<(Point, Velocity)> {
+        let file = File::open("inputs/day14.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+
+        buf_reader
+            .lines()
+            .map(|s| {
+                let s = s.unwrap();
+                let (sp, sv) = s.trim().rsplit_once(" ").unwrap();
+                let (px, py) = sp.rsplit_once("=").unwrap().1.rsplit_once(",").unwrap();
+                let (vx, vy) = sv.rsplit_once("=").unwrap().1.rsplit_once(",").unwrap();
+                (
+                    Point::new(px.parse().unwrap(), py.parse().unwrap()),
+                    Velocity::new(vx.parse().unwrap(), vy.parse().unwrap()),
+                )
+            })
+            .collect()
+    }
+
+    fn safety_factor(final_positions: &Vec<Point>, min_x: u64, min_y: u64) -> u64 {
+        let max_x = min_x + (X / 2) - 1;
+        let max_y = min_y + (Y / 2) - 1;
+        // println!("... {min_x} {max_x} {min_y} {max_y}");
+        let a = final_positions
+            .iter()
+            .filter(|p| {
+                let x = p.x as u64;
+                let y = p.y as u64;
+                min_x <= x && x <= max_x && min_y <= y && y <= max_y
+            })
+            .count() as u64;
+        // println!("... {a}");
+        a
+    }
+
+    #[test]
+    fn part1() {
+        let pvs = load_inputs();
+
+        let final_positions: Vec<Point> = pvs
+            .iter()
+            .map(|(p, v)| {
+                let final_pos = *p + (*v * 100);
+                // println!("!!! {final_pos:?}");
+                final_pos
+            })
+            .collect();
+
+        let res = safety_factor(&final_positions, 0, 0)
+            * safety_factor(&final_positions, X / 2 + 1, 0)
+            * safety_factor(&final_positions, 0, Y / 2 + 1)
+            * safety_factor(&final_positions, X / 2 + 1, Y / 2 + 1);
+
+        println!("D14P1: {res}");
+    }
+
+    fn display(pvs: &Vec<(Point, Velocity)>) {
+        let mut tiles: Vec<Vec<u32>> = (0..X).map(|_| vec![0; Y as usize]).collect();
+        for pv in pvs {
+            tiles[pv.0.x as usize][pv.0.y as usize] += 1;
+        }
+
+        for row in tiles {
+            let display_row: String = row.iter().map(|n| if *n > 0 { '*' } else { ' ' }).collect();
+            println!("{:?}", display_row);
+        }
+    }
+
+    #[test]
+    fn part2() {
+        let mut pvs = load_inputs();
+
+        let mut count = 1;
+        loop {
+            pvs = pvs.iter().map(|(p, v)| (*p + *v, *v)).collect();
+            let poss = pvs.iter().map(|e| e.0).collect();
+            let res = safety_factor(&poss, 0, 0)
+                * safety_factor(&poss, X / 2 + 1, 0)
+                * safety_factor(&poss, 0, Y / 2 + 1)
+                * safety_factor(&poss, X / 2 + 1, Y / 2 + 1);
+            if res < 100_000_000 {
+                println!("-----------------  {count}  -----------------");
+                display(&pvs);
+                sleep(Duration::from_millis(100));
+            }
+            count += 1;
+        }
+    }
+}
