@@ -1437,13 +1437,10 @@ mod day14 {
         fn add(self, rhs: Velocity) -> Self::Output {
             let x = X as i64;
             let y = Y as i64;
-            let mut added = Self::new((self.x + (rhs.x % x)) % x, (self.y + (rhs.y % y)) % y);
-            if added.x < 0 {
-                added.x = x + added.x;
-            }
-            if added.y < 0 {
-                added.y = y + added.y;
-            }
+            let added = Self::new(
+                (self.x + rhs.x).rem_euclid(x),
+                (self.y + rhs.y).rem_euclid(y),
+            );
             added
         }
     }
@@ -1492,17 +1489,14 @@ mod day14 {
     fn safety_factor(final_positions: &Vec<Point>, min_x: u64, min_y: u64) -> u64 {
         let max_x = min_x + (X / 2) - 1;
         let max_y = min_y + (Y / 2) - 1;
-        // println!("... {min_x} {max_x} {min_y} {max_y}");
-        let a = final_positions
+        final_positions
             .iter()
             .filter(|p| {
                 let x = p.x as u64;
                 let y = p.y as u64;
                 min_x <= x && x <= max_x && min_y <= y && y <= max_y
             })
-            .count() as u64;
-        // println!("... {a}");
-        a
+            .count() as u64
     }
 
     #[test]
@@ -1513,7 +1507,6 @@ mod day14 {
             .iter()
             .map(|(p, v)| {
                 let final_pos = *p + (*v * 100);
-                // println!("!!! {final_pos:?}");
                 final_pos
             })
             .collect();
@@ -1542,6 +1535,12 @@ mod day14 {
     fn part2() {
         let mut pvs = load_inputs();
 
+        let run = false;
+        if !run {
+            println!("D14P2: -");
+            return;
+        }
+
         let mut count = 1;
         loop {
             pvs = pvs.iter().map(|(p, v)| (*p + *v, *v)).collect();
@@ -1558,4 +1557,21 @@ mod day14 {
             count += 1;
         }
     }
+}
+
+mod day15 {
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    fn load_inputs() {
+        // TODO
+    }
+
+    #[test]
+    fn part1() {}
+
+    #[test]
+    fn part2() {}
 }
