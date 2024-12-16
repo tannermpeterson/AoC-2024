@@ -1561,17 +1561,249 @@ mod day14 {
 
 mod day15 {
     use std::{
+        cmp::Ordering,
+        collections::HashMap,
         fs::File,
         io::{BufRead, BufReader},
     };
 
-    fn load_inputs() {
-        // TODO
+    fn load_inputs() -> (Vec<Vec<char>>, String) {
+        let file = File::open("inputs/day15.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+
+        let mut buf_reader_lines = buf_reader.lines();
+        let tiles = buf_reader_lines
+            .by_ref()
+            .map_while(|s| {
+                let s = s.unwrap();
+                let s = s.trim();
+                if s.len() == 0 {
+                    None
+                } else {
+                    Some(s.chars().collect())
+                }
+            })
+            .collect();
+        let moves: String = buf_reader_lines
+            .flat_map(|s| {
+                let s = s.unwrap();
+                s.chars().collect::<Vec<char>>()
+            })
+            .collect();
+
+        (tiles, moves)
+    }
+
+    fn display_tiles(tiles: &Vec<Vec<char>>) {
+        for row in tiles {
+            let row: String = row.iter().collect();
+            println!("{}", row);
+        }
+    }
+
+    fn get_starting_pos(tiles: &Vec<Vec<char>>) -> (usize, usize) {
+        for r in 0..tiles.len() {
+            for c in 0..tiles[0].len() {
+                if tiles[r][c] == '@' {
+                    return (r, c);
+                }
+            }
+        }
+        panic!("@ not found");
     }
 
     #[test]
-    fn part1() {}
+    fn part1() {
+        let (mut tiles, moves) = load_inputs();
+
+        let mut pos = get_starting_pos(&tiles);
+
+        'outer: for (move_num, m) in moves.chars().enumerate() {
+            // display_tiles(&tiles);
+            // println!("---------------- {move_num} {m} ----------------");
+            let dir = match m {
+                '<' => (0, -1),
+                '>' => (0, 1),
+                '^' => (-1, 0),
+                'v' => (1, 0),
+                m => panic!("invalid move {m}"),
+            };
+            let mut target_pos = (
+                pos.0.wrapping_add_signed(dir.0),
+                pos.1.wrapping_add_signed(dir.1),
+            );
+            let new_robot_pos = target_pos;
+            let mut new_box_pos: Option<(usize, usize)> = None;
+
+            // TODO try while let here
+            loop {
+                match tiles[target_pos.0][target_pos.1] {
+                    '#' => continue 'outer,
+                    '.' => break,
+                    'O' => {
+                        target_pos = (
+                            target_pos.0.wrapping_add_signed(dir.0),
+                            target_pos.1.wrapping_add_signed(dir.1),
+                        );
+                        new_box_pos = Some(target_pos);
+                    }
+                    ch => panic!("invalid char {ch} at position {target_pos:?}"),
+                }
+            }
+            tiles[pos.0][pos.1] = '.';
+            tiles[new_robot_pos.0][new_robot_pos.1] = '@';
+            if let Some(new_box_pos) = new_box_pos {
+                tiles[new_box_pos.0][new_box_pos.1] = 'O';
+            }
+            pos = new_robot_pos;
+        }
+
+        // display_tiles(&tiles);
+
+        let res: usize = tiles
+            .iter()
+            .enumerate()
+            .flat_map(|(r, row)| {
+                row.iter()
+                    .enumerate()
+                    .map(move |(c, ch)| if *ch == 'O' { r * 100 + c } else { 0 })
+            })
+            .sum();
+
+        println!("D15P1: {res}");
+    }
+
+    fn widen(tiles: Vec<Vec<char>>) -> Vec<Vec<char>> {
+        tiles
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .flat_map(|ch| {
+                        match ch {
+                            '@' => "@.".to_string(),
+                            'O' => "[]".to_string(),
+                            ch => format!("{ch}{ch}"),
+                        }
+                        .chars()
+                        .collect::<Vec<char>>()
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn check_vertical_move(
+        tiles: &Vec<Vec<char>>,
+        curr_pos: (usize, usize),
+        dir_v: isize,
+    ) -> Result<Option<HashMap<(usize, usize), (usize, usize)>>, ()> {
+        let target_pos_1 = (curr_pos.0.wrapping_add_signed(dir_v), curr_pos.1);
+        let target_pos_2 = match tiles[curr_pos.0][curr_pos.1] {
+            '.' => return Ok(None),
+            '#' => return Err(()),
+            '@' => None,
+            '[' => Some((target_pos_1.0, target_pos_1.1 + 1)),
+            ']' => Some((target_pos_1.0, target_pos_1.1 - 1)),
+            ch => panic!("invalid char {ch} at position {curr_pos:?}"),
+        };
+        let mut hm = check_vertical_move(tiles, target_pos_1, dir_v)?.unwrap_or_default();
+        hm.insert(curr_pos, target_pos_1);
+        if let Some(target_pos_2) = target_pos_2 {
+            if let Some(hm_r) = check_vertical_move(tiles, target_pos_2, dir_v)? {
+                hm.extend(hm_r);
+            }
+            hm.insert((curr_pos.0, target_pos_2.1), target_pos_2);
+        }
+        Ok(Some(hm))
+    }
+
+    fn check_horizontal_move(
+        tiles: &Vec<Vec<char>>,
+        curr_pos: (usize, usize),
+        dir_h: isize,
+    ) -> Result<usize, ()> {
+        let mut final_idx = curr_pos.1.wrapping_add_signed(dir_h);
+        loop {
+            match tiles[curr_pos.0][final_idx] {
+                '#' => return Err(()),
+                '.' => return Ok(final_idx),
+                '[' | ']' => final_idx = final_idx.wrapping_add_signed(dir_h),
+                ch => {
+                    let invalid_pos = (final_idx, curr_pos.1);
+                    panic!("invalid char {ch} at position {invalid_pos:?}")
+                }
+            }
+        }
+    }
 
     #[test]
-    fn part2() {}
+    fn part2() {
+        let (tiles, moves) = load_inputs();
+        let mut tiles = widen(tiles);
+
+        let mut curr_pos = get_starting_pos(&tiles);
+
+        for (move_num, m) in moves.chars().enumerate() {
+            // display_tiles(&tiles);
+            // println!("---------------- {move_num} {m} ----------------");
+            let dir = match m {
+                '<' => (0, -1),
+                '>' => (0, 1),
+                '^' => (-1, 0),
+                'v' => (1, 0),
+                m => panic!("invalid move {m}"),
+            };
+            // TODO could probably clean this up
+            if dir.0 == 0 {
+                if let Ok(mut final_idx) = check_horizontal_move(&tiles, curr_pos, dir.1) {
+                    while final_idx != curr_pos.1 {
+                        let prev_idx = final_idx.wrapping_add_signed(-dir.1);
+                        tiles[curr_pos.0][final_idx] = tiles[curr_pos.0][prev_idx];
+                        final_idx = prev_idx;
+                    }
+                    tiles[curr_pos.0][curr_pos.1] = '.';
+                    curr_pos = (
+                        curr_pos.0.wrapping_add_signed(dir.0),
+                        curr_pos.1.wrapping_add_signed(dir.1),
+                    );
+                }
+            } else if let Ok(Some(pos_updates)) = check_vertical_move(&tiles, curr_pos, dir.0) {
+                let mut keys: Vec<&(usize, usize)> = pos_updates.keys().collect();
+                keys.sort_by(|pos1, pos2| {
+                    let (pos1, pos2) = if dir.0 > 0 {
+                        (pos2, pos1)
+                    } else {
+                        (pos1, pos2)
+                    };
+                    match pos1.0.cmp(&pos2.0) {
+                        Ordering::Equal => pos1.1.cmp(&pos2.1),
+                        o => o,
+                    }
+                });
+                for old_pos in keys {
+                    let new_pos = pos_updates[old_pos];
+                    tiles[new_pos.0][new_pos.1] = tiles[old_pos.0][old_pos.1];
+                    tiles[old_pos.0][old_pos.1] = '.';
+                }
+                curr_pos = (
+                    curr_pos.0.wrapping_add_signed(dir.0),
+                    curr_pos.1.wrapping_add_signed(dir.1),
+                );
+            }
+        }
+
+        // display_tiles(&tiles);
+
+        let res: usize = tiles
+            .iter()
+            .enumerate()
+            .flat_map(|(r, row)| {
+                row.iter()
+                    .enumerate()
+                    .map(move |(c, ch)| if *ch == '[' { r * 100 + c } else { 0 })
+            })
+            .sum();
+
+        println!("D15P2: {res}");
+    }
 }
