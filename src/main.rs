@@ -1807,3 +1807,178 @@ mod day15 {
         println!("D15P2: {res}");
     }
 }
+
+mod day16 {
+    use std::{
+        collections::{HashMap, HashSet},
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    use rtrb::RingBuffer;
+
+    const DIRS: [(isize, isize); 4] = [(0, 1), (-1, 0), (0, -1), (1, 0)];
+
+    #[derive(Debug)]
+    struct Node {
+        pos: (usize, usize),
+        score: u32,
+        dir_idx: usize,
+    }
+
+    impl Node {
+        fn new(pos: (usize, usize), score: u32, dir_idx: usize) -> Self {
+            Self {
+                pos,
+                score,
+                dir_idx,
+            }
+        }
+    }
+
+    fn load_inputs() -> (Vec<Vec<char>>, (usize, usize), (usize, usize)) {
+        let file = File::open("inputs/day16.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+
+        let buf_reader_lines = buf_reader.lines();
+        let tiles: Vec<Vec<char>> = buf_reader_lines
+            .map(|s| s.unwrap().chars().collect())
+            .collect();
+
+        let mut start = (0, 0);
+        let mut end = (0, 0);
+        for r in 0..tiles.len() {
+            for c in 0..tiles[0].len() {
+                match tiles[r][c] {
+                    'S' => start = (r, c),
+                    'E' => end = (r, c),
+                    _ => (),
+                }
+            }
+        }
+
+        (tiles, start, end)
+    }
+
+    fn walk_maze(
+        tiles: Vec<Vec<char>>,
+        start: (usize, usize),
+    ) -> HashMap<(usize, usize), HashMap<usize, u32>> {
+        let (mut producer, mut consumer) = RingBuffer::new(1000);
+        producer
+            .push(Node::new(start, 0u32, 0usize))
+            .expect("failed to push to rb");
+
+        let mut checked_tiles: HashMap<(usize, usize), HashMap<usize, u32>> = HashMap::new();
+        while !consumer.is_empty() {
+            let curr = consumer.pop().unwrap();
+
+            let tile_scores = checked_tiles.entry(curr.pos).or_default();
+            let score_for_dir = tile_scores.entry(curr.dir_idx).or_insert(u32::MAX);
+            if *score_for_dir <= curr.score {
+                continue;
+            }
+
+            if tiles[curr.pos.0][curr.pos.1] != 'E' {
+                for idx_inc in -1..=1 {
+                    let dir_idx =
+                        (curr.dir_idx as isize + idx_inc).rem_euclid(DIRS.len() as isize) as usize;
+
+                    let dir = DIRS[dir_idx];
+                    let next_pos = (
+                        curr.pos.0.wrapping_add_signed(dir.0),
+                        curr.pos.1.wrapping_add_signed(dir.1),
+                    );
+                    if tiles[next_pos.0][next_pos.1] == '#' {
+                        continue;
+                    }
+                    let cost = 1 + (idx_inc as u32 % 2) * 1000;
+                    producer
+                        .push(Node::new(next_pos, curr.score + cost, dir_idx))
+                        .expect("failed to push to rb");
+                }
+            }
+
+            tile_scores.insert(curr.dir_idx, curr.score);
+        }
+
+        checked_tiles
+    }
+
+    fn get_min_score(
+        checked_tiles: &HashMap<(usize, usize), HashMap<usize, u32>>,
+        end: (usize, usize),
+    ) -> u32 {
+        let dir_to_score = checked_tiles.get(&end).expect("end not reached");
+        let min_score = dir_to_score
+            .values()
+            .min()
+            .expect("end reached without score");
+        *min_score
+    }
+
+    #[test]
+    fn part1() {
+        let (tiles, start, end) = load_inputs();
+
+        let checked_tiles = walk_maze(tiles, start);
+        let min_score = get_min_score(&checked_tiles, end);
+
+        println!("D16P1: {min_score}");
+    }
+
+    fn get_num_best_path_tiles(
+        checked_tiles: HashMap<(usize, usize), HashMap<usize, u32>>,
+        end: (usize, usize),
+    ) -> u32 {
+        let mut best_path_tiles: HashSet<(usize, usize)> = HashSet::new();
+
+        let min_score = get_min_score(&checked_tiles, end);
+
+        let (mut producer, mut consumer) = RingBuffer::new(100);
+        let dir_to_score = checked_tiles.get(&end).expect("node not found");
+        for (dir_idx, score) in dir_to_score {
+            if *score == min_score {
+                producer
+                    .push(Node::new(end, min_score + 1, *dir_idx))
+                    .expect("failed to push to rb");
+            }
+        }
+
+        while !consumer.is_empty() {
+            let node = consumer.pop().unwrap();
+            let dir_to_score = checked_tiles.get(&node.pos).expect("node not found");
+            for (dir_idx, dir_score) in dir_to_score {
+                let dir = DIRS[*dir_idx];
+
+                let offset = if *dir_idx == node.dir_idx { 1 } else { 1001 };
+                if *dir_score != node.score - offset {
+                    continue;
+                }
+
+                best_path_tiles.insert(node.pos);
+                let prev_pos = (
+                    node.pos.0.wrapping_add_signed(-dir.0),
+                    node.pos.1.wrapping_add_signed(-dir.1),
+                );
+                if *dir_score > 0 {
+                    producer
+                        .push(Node::new(prev_pos, *dir_score, *dir_idx))
+                        .expect("failed to push to rb");
+                }
+            }
+        }
+
+        best_path_tiles.len() as u32
+    }
+
+    #[test]
+    fn part2() {
+        let (tiles, start, end) = load_inputs();
+
+        let checked_tiles = walk_maze(tiles, start);
+        let num_best_path_tiles = get_num_best_path_tiles(checked_tiles, end);
+
+        println!("D16P2: {num_best_path_tiles}");
+    }
+}
