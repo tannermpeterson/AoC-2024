@@ -1982,3 +1982,206 @@ mod day16 {
         println!("D16P2: {num_best_path_tiles}");
     }
 }
+
+mod day17 {
+    use std::{
+        collections::{HashMap, HashSet},
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    fn load_inputs() -> Cpu {
+        let file = File::open("inputs/day17.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+
+        let mut buf_reader_lines = buf_reader.lines();
+        let a = get_split_line(buf_reader_lines.next().unwrap().unwrap())
+            .parse()
+            .unwrap();
+        let b = get_split_line(buf_reader_lines.next().unwrap().unwrap())
+            .parse()
+            .unwrap();
+        let c = get_split_line(buf_reader_lines.next().unwrap().unwrap())
+            .parse()
+            .unwrap();
+
+        buf_reader_lines.next();
+
+        let program = get_split_line(buf_reader_lines.next().unwrap().unwrap())
+            .split(",")
+            .map(|s| s.parse::<u64>().unwrap())
+            .collect();
+
+        Cpu::new(a, b, c, program)
+    }
+
+    fn get_split_line(l: String) -> String {
+        l.rsplit_once(":").unwrap().1.trim().to_string()
+    }
+
+    struct Cpu {
+        rega: u64,
+        regb: u64,
+        regc: u64,
+        iptr: usize,
+        program: Vec<u64>,
+    }
+
+    impl Cpu {
+        fn new(rega: u64, regb: u64, regc: u64, program: Vec<u64>) -> Self {
+            Self {
+                rega,
+                regb,
+                regc,
+                iptr: 0,
+                program,
+            }
+        }
+
+        fn combo(&self, operand: u64) -> u64 {
+            match operand {
+                n if n <= 3 => n,
+                4 => self.rega,
+                5 => self.regb,
+                6 => self.regc,
+                invalid => panic!("invalid operand: {invalid}"),
+            }
+        }
+
+        fn cycle(&mut self) -> (usize, Option<u64>) {
+            let opcode = self.program[self.iptr];
+            let operand = self.program[self.iptr + 1];
+            let mut next_iptr = self.iptr + 2;
+
+            let mut output: Option<u64> = None;
+
+            match opcode {
+                0 => {
+                    // adv
+                    self.rega /= 2u64.pow(self.combo(operand) as u32);
+                }
+                1 => {
+                    // bxl
+                    self.regb ^= operand;
+                }
+                2 => {
+                    //bst
+                    self.regb = self.combo(operand) % 8;
+                }
+                3 => {
+                    // jnz
+                    if self.rega != 0 {
+                        next_iptr = operand as usize;
+                    }
+                }
+                4 => {
+                    // bxc
+                    self.regb ^= self.regc;
+                }
+                5 => {
+                    // out
+                    output = Some(self.combo(operand) % 8);
+                }
+                6 => {
+                    // bdv
+                    self.regb = self.rega / 2u64.pow(self.combo(operand) as u32);
+                }
+                7 => {
+                    // cdv
+                    self.regc = self.rega / 2u64.pow(self.combo(operand) as u32);
+                }
+                invalid => panic!("invalid opcode: {invalid}"),
+            }
+
+            (next_iptr, output)
+        }
+
+        fn run(mut self) -> Vec<u64> {
+            let mut output: Vec<u64> = Vec::new();
+
+            while self.iptr < self.program.len() {
+                let (next_iptr, out) = self.cycle();
+                self.iptr = next_iptr;
+                if let Some(out) = out {
+                    output.push(out);
+                }
+            }
+
+            output
+        }
+
+        fn optimize(mut self) -> u64 {
+            let mut test: HashSet<u64> = HashSet::new();
+
+            let bases: Vec<u64> = vec![
+                0b1011011010110111010111101,
+                0b1011011010110111110111101,
+                0b0111011010110111010111101,
+                0b0111011010110111110111101,
+                0b1111011010110111010111101,
+                0b1111011010110111110111101,
+                0b0110100100111100110110101,
+            ];
+
+            let len: u64 = 3 * 8 + 1;
+
+            for a in 0.. {
+                for base in &bases {
+                    let rega = (a << len) + base;
+                    self.rega = rega;
+                    self.regb = 0;
+                    self.regc = 0;
+
+                    let mut output_idx = 0;
+                    self.iptr = 0;
+
+                    while self.iptr < self.program.len() {
+                        let (next_iptr, out) = self.cycle();
+                        self.iptr = next_iptr;
+                        match out {
+                            Some(out) => {
+                                if out != self.program[output_idx] {
+                                    break;
+                                }
+                                output_idx += 1;
+                                if output_idx >= 12 {
+                                    let mask = rega & 0b111_111_111_111_111_111_111_111_111_111;
+                                    if !test.contains(&mask) {
+                                        println!("0b{:b}", mask);
+                                        test.insert(mask);
+                                    }
+                                }
+                                if output_idx == self.program.len() {
+                                    return rega;
+                                }
+                            }
+                            None => (),
+                        }
+                    }
+                }
+            }
+
+            panic!("!!!");
+        }
+    }
+
+    #[test]
+    fn part1() {
+        let cpu = load_inputs();
+        let output = cpu.run();
+        println!("D17P1: {}", format!("{:?}", output).replace(" ", ""));
+    }
+
+    #[test]
+    fn part2() {
+        let run = false;
+        let res = if run {
+            let cpu = load_inputs();
+            cpu.optimize().to_string()
+        } else {
+            "-".to_string()
+        };
+
+        println!("D17P2: {res}");
+    }
+}
