@@ -2125,40 +2125,41 @@ mod day17 {
 
             let len: u64 = 3 * 8 + 1;
 
-            for a in 0.. {
-                for base in &bases {
-                    let rega = (a << len) + base;
-                    self.rega = rega;
-                    self.regb = 0;
-                    self.regc = 0;
+            for a in 0..8 {
+                // for base in &bases {
+                let rega = a; // = (a << len) + base;
+                self.rega = rega;
+                self.regb = 0;
+                self.regc = 0;
 
-                    let mut output_idx = 0;
-                    self.iptr = 0;
+                let mut output_idx = 0;
+                self.iptr = 0;
 
-                    while self.iptr < self.program.len() {
-                        let (next_iptr, out) = self.cycle();
-                        self.iptr = next_iptr;
-                        match out {
-                            Some(out) => {
-                                if out != self.program[output_idx] {
-                                    break;
-                                }
-                                output_idx += 1;
-                                if output_idx >= 12 {
-                                    let mask = rega & 0b111_111_111_111_111_111_111_111_111_111;
-                                    if !test.contains(&mask) {
-                                        println!("0b{:b}", mask);
-                                        test.insert(mask);
-                                    }
-                                }
-                                if output_idx == self.program.len() {
-                                    return rega;
-                                }
-                            }
-                            None => (),
+                while self.iptr < self.program.len() {
+                    let (next_iptr, out) = self.cycle();
+                    self.iptr = next_iptr;
+                    match out {
+                        Some(out) => {
+                            println!("!!! {a} {out}");
+                            // if out != self.program[output_idx] {
+                            //     break;
+                            // }
+                            // output_idx += 1;
+                            // if output_idx >= 1 {
+                            //     let mask = rega & 0b111_111_111_111_111_111_111_111_111_111;
+                            //     if !test.contains(&mask) {
+                            //         println!("0b{:b}", mask);
+                            //         test.insert(mask);
+                            //     }
+                            // }
+                            // if output_idx == self.program.len() {
+                            //     return rega;
+                            // }
                         }
+                        None => (),
                     }
                 }
+                // }
             }
 
             panic!("!!!");
@@ -2174,7 +2175,7 @@ mod day17 {
 
     #[test]
     fn part2() {
-        let run = false;
+        let run = true;
         let res = if run {
             let cpu = load_inputs();
             cpu.optimize().to_string()
