@@ -2186,3 +2186,106 @@ mod day17 {
         println!("D17P2: {res}");
     }
 }
+
+mod day18 {
+    use std::collections::HashSet;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    use rtrb::RingBuffer;
+
+    fn load_inputs() -> Vec<(usize, usize)> {
+        let file = File::open("inputs/day18.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        buf_reader
+            .lines()
+            .map(|line| {
+                let line = line.unwrap();
+                let (r, c) = line.rsplit_once(",").unwrap();
+                (r.parse().unwrap(), c.parse().unwrap())
+            })
+            .collect()
+    }
+
+    const DIRS: [(isize, isize); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+
+    fn find_exit(tiles: &Vec<Vec<bool>>) -> Result<u64, ()> {
+        let len = tiles.len();
+
+        let mut checked_tiles: HashSet<(usize, usize)> = HashSet::new();
+
+        let (mut producer, mut consumer) = RingBuffer::new(300);
+        producer.push(((0, 0), 0)).expect("failed to push to rb");
+
+        while !consumer.is_empty() {
+            let (pos, count) = consumer.pop().unwrap();
+            if checked_tiles.contains(&pos) {
+                continue;
+            }
+            checked_tiles.insert(pos);
+            if pos == (len - 1, len - 1) {
+                return Ok(count);
+            }
+            for dir in DIRS {
+                let r_next = pos.0.wrapping_add_signed(dir.0);
+                let c_next = pos.1.wrapping_add_signed(dir.1);
+                if r_next < len && c_next < len && !tiles[r_next][c_next] {
+                    producer
+                        .push(((r_next, c_next), count + 1))
+                        .expect("failed to push to rb");
+                }
+            }
+        }
+
+        Err(())
+    }
+
+    #[test]
+    fn part1() {
+        let coords = load_inputs();
+
+        let mut tiles: Vec<Vec<bool>> = vec![vec![false; 71]; 71];
+
+        let sim = 1024;
+
+        for idx in 0..sim {
+            let coord = coords[idx];
+            tiles[coord.0][coord.1] = true;
+        }
+
+        let count = find_exit(&tiles).unwrap();
+
+        println!("D18P1: {count}");
+    }
+
+    #[test]
+    fn part2() {
+        let coords = load_inputs();
+
+        let base_tiles: Vec<Vec<bool>> = vec![vec![false; 71]; 71];
+
+        let mut upper_byte_idx = coords.len() - 1;
+        let mut lower_byte_idx = 0;
+
+        let res = loop {
+            let byte_idx = (upper_byte_idx + lower_byte_idx) / 2;
+
+            let mut tiles = base_tiles.clone();
+            for idx in 0..=byte_idx {
+                let coord = coords[idx];
+                tiles[coord.0][coord.1] = true;
+            }
+
+            if find_exit(&tiles).is_ok() {
+                lower_byte_idx = byte_idx;
+            } else {
+                upper_byte_idx = byte_idx;
+            }
+            if lower_byte_idx >= upper_byte_idx - 1 {
+                break coords[upper_byte_idx];
+            }
+        };
+
+        println!("D18P2: {},{}", res.0, res.1);
+    }
+}
