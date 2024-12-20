@@ -2378,6 +2378,6 @@ mod day19 {
             .iter()
             .map(|d| num_arrangements(d, &patterns, &mut HashMap::new()) as u64)
             .sum();
-        println!("D19P1: {res}");
+        println!("D19P2: {res}");
     }
 }
