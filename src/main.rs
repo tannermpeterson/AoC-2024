@@ -2289,3 +2289,95 @@ mod day18 {
         println!("D18P2: {},{}", res.0, res.1);
     }
 }
+
+mod day19 {
+    use std::collections::HashMap;
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    fn load_inputs() -> (Vec<String>, Vec<String>) {
+        let file = File::open("inputs/day19.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        let mut buf_reader_lines = buf_reader.lines();
+
+        let patterns = buf_reader_lines
+            .next()
+            .unwrap()
+            .unwrap()
+            .trim()
+            .split(", ")
+            .map(|s| s.to_string())
+            .collect();
+
+        buf_reader_lines.next();
+
+        let designs = buf_reader_lines.map(|s| s.unwrap()).collect();
+
+        (patterns, designs)
+    }
+
+    fn is_valid(design: &str, patterns: &Vec<String>) -> bool {
+        if design.len() == 0 {
+            return true;
+        }
+
+        for p in patterns {
+            match design.split_once(p) {
+                Some((d1, d2)) if d1.len() == 0 => {
+                    if is_valid(d2, &patterns) {
+                        return true;
+                    }
+                }
+                _ => continue,
+            }
+        }
+
+        false
+    }
+
+    #[test]
+    fn part1() {
+        let (patterns, designs) = load_inputs();
+        let res: u32 = designs.iter().map(|d| is_valid(d, &patterns) as u32).sum();
+        println!("D19P1: {res}");
+    }
+
+    fn num_arrangements<'a>(
+        design: &'a str,
+        patterns: &Vec<String>,
+        memo: &mut HashMap<&'a str, u64>,
+    ) -> u64 {
+        if let Some(count) = memo.get(design) {
+            return *count;
+        }
+
+        if design.len() == 0 {
+            return 1;
+        }
+
+        let mut count = 0;
+
+        for p in patterns {
+            match design.split_once(p) {
+                Some((d1, d2)) if d1.len() == 0 => {
+                    count += num_arrangements(d2, &patterns, memo);
+                }
+                _ => continue,
+            }
+        }
+
+        memo.insert(design, count);
+
+        count
+    }
+
+    #[test]
+    fn part2() {
+        let (patterns, designs) = load_inputs();
+        let res: u64 = designs
+            .iter()
+            .map(|d| num_arrangements(d, &patterns, &mut HashMap::new()) as u64)
+            .sum();
+        println!("D19P1: {res}");
+    }
+}
