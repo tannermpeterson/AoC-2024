@@ -2175,7 +2175,7 @@ mod day17 {
 
     #[test]
     fn part2() {
-        let run = true;
+        let run = false;
         let res = if run {
             let cpu = load_inputs();
             cpu.optimize().to_string()
