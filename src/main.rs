@@ -2344,22 +2344,22 @@ mod day19 {
 
     fn num_arrangements<'a>(
         design: &'a str,
-        patterns: &Vec<String>,
+        patterns: &Vec<&String>,
         memo: &mut HashMap<&'a str, u64>,
     ) -> u64 {
-        if let Some(count) = memo.get(design) {
-            return *count;
-        }
-
         if design.len() == 0 {
             return 1;
+        }
+
+        if let Some(count) = memo.get(design) {
+            return *count;
         }
 
         let mut count = 0;
 
         for p in patterns {
-            match design.split_once(p) {
-                Some((d1, d2)) if d1.len() == 0 => {
+            match design.split_once(*p) {
+                Some(("", d2)) => {
                     count += num_arrangements(d2, &patterns, memo);
                 }
                 _ => continue,
@@ -2376,7 +2376,11 @@ mod day19 {
         let (patterns, designs) = load_inputs();
         let res: u64 = designs
             .iter()
-            .map(|d| num_arrangements(d, &patterns, &mut HashMap::new()) as u64)
+            .map(|d| {
+                let filtered_patterns: Vec<&String> =
+                    patterns.iter().filter(|p| d.contains(*p)).collect();
+                num_arrangements(d, &filtered_patterns, &mut HashMap::new()) as u64
+            })
             .sum();
         println!("D19P2: {res}");
     }
