@@ -2385,3 +2385,131 @@ mod day19 {
         println!("D19P2: {res}");
     }
 }
+
+mod day20 {
+    use std::{
+        collections::HashMap,
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    const DIRS: [(isize, isize); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+
+    fn load_inputs() -> (Vec<Vec<char>>, (usize, usize), (usize, usize)) {
+        let file = File::open("inputs/day20.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+
+        let buf_reader_lines = buf_reader.lines();
+        let tiles: Vec<Vec<char>> = buf_reader_lines
+            .map(|s| s.unwrap().chars().collect())
+            .collect();
+
+        let mut start = (0, 0);
+        let mut end = (0, 0);
+        for r in 0..tiles.len() {
+            for c in 0..tiles[0].len() {
+                match tiles[r][c] {
+                    'S' => start = (r, c),
+                    'E' => end = (r, c),
+                    _ => (),
+                }
+            }
+        }
+
+        (tiles, start, end)
+    }
+
+    fn index_path(
+        tiles: Vec<Vec<char>>,
+        start: (usize, usize),
+        end: (usize, usize),
+    ) -> HashMap<(usize, usize), u32> {
+        let mut path_idxs: HashMap<(usize, usize), u32> = HashMap::new();
+
+        let mut idx = 0;
+
+        let mut pos = start;
+        path_idxs.insert(pos, idx);
+        'outer: while pos != end {
+            for dir in DIRS {
+                let new_pos = (
+                    pos.0.wrapping_add_signed(dir.0),
+                    pos.1.wrapping_add_signed(dir.1),
+                );
+                if new_pos.0 < tiles.len()
+                    && new_pos.1 < tiles[0].len()
+                    && tiles[new_pos.0][new_pos.1] != '#'
+                    && !path_idxs.contains_key(&new_pos)
+                {
+                    pos = new_pos;
+                    idx += 1;
+                    path_idxs.insert(pos, idx);
+                    continue 'outer;
+                }
+            }
+            panic!("next pos not found");
+        }
+
+        path_idxs
+    }
+
+    #[test]
+    fn part1() {
+        let (tiles, start, end) = load_inputs();
+
+        let indexed_tiles = index_path(tiles, start, end);
+
+        let res: u32 = indexed_tiles
+            .iter()
+            .map(|(pos, idx)| {
+                DIRS.iter()
+                    .map(|dir| {
+                        let cheat_dur = 2;
+                        let new_pos = (
+                            pos.0.wrapping_add_signed(dir.0 * cheat_dur),
+                            pos.1.wrapping_add_signed(dir.1 * cheat_dur),
+                        );
+                        if let Some(new_idx) = indexed_tiles.get(&new_pos) {
+                            let time_save = new_idx.saturating_sub(*idx + cheat_dur as u32);
+                            (time_save >= 100) as u32
+                        } else {
+                            0
+                        }
+                    })
+                    .sum::<u32>()
+            })
+            .sum();
+
+        println!("D20P1: {res}");
+    }
+
+    #[test]
+    fn part2() {
+        let (tiles, start, end) = load_inputs();
+
+        let indexed_tiles = index_path(tiles, start, end);
+
+        // TODO how to improve this?
+        let res: u32 = indexed_tiles
+            .iter()
+            .map(|(pos, idx)| {
+                indexed_tiles
+                    .iter()
+                    .map(|(new_pos, new_idx)| {
+                        let r_diff = ((new_pos.0 as i32) - (pos.0 as i32)).abs();
+                        let c_diff = ((new_pos.1 as i32) - (pos.1 as i32)).abs();
+                        let cheat_dur = c_diff + r_diff;
+                        if cheat_dur <= 20 {
+                            let time_save = new_idx.saturating_sub(*idx + cheat_dur as u32);
+                            (time_save >= 100) as u32
+                        } else {
+                            0
+                        }
+                    })
+                    .sum::<u32>()
+            })
+            .sum();
+
+        println!("D20P2: {res}");
+    }
+}
