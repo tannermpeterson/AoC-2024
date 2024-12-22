@@ -2513,3 +2513,203 @@ mod day20 {
         println!("D20P2: {res}");
     }
 }
+
+mod day21 {
+    use std::{
+        collections::HashMap,
+        fs::File,
+        io::{BufRead, BufReader},
+        iter,
+    };
+
+    fn load_inputs() -> Vec<String> {
+        let file = File::open("inputs/day21.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        buf_reader.lines().map(|s| s.unwrap()).collect()
+    }
+
+    const KEYPAD: [[char; 3]; 4] = [
+        ['7', '8', '9'],
+        ['4', '5', '6'],
+        ['1', '2', '3'],
+        ['_', '0', 'A'],
+    ];
+
+    const CONTROL_PAD: [[char; 3]; 2] = [['_', '^', 'A'], ['<', 'v', '>']];
+
+    fn get_coords() -> (HashMap<char, (usize, usize)>, HashMap<char, (usize, usize)>) {
+        let keypad_coords: HashMap<char, (usize, usize)> = KEYPAD
+            .iter()
+            .enumerate()
+            .flat_map(|(r, row)| row.iter().enumerate().map(move |(c, ch)| (*ch, (r, c))))
+            .collect();
+
+        let control_pad_coords: HashMap<char, (usize, usize)> = CONTROL_PAD
+            .iter()
+            .enumerate()
+            .flat_map(|(r, row)| row.iter().enumerate().map(move |(c, ch)| (*ch, (r, c))))
+            .collect();
+
+        (keypad_coords, control_pad_coords)
+    }
+
+    fn get_controls(
+        curr_ch: char,
+        next_ch: char,
+        btn_coords: &HashMap<char, (usize, usize)>,
+    ) -> (Vec<char>, Vec<char>) {
+        let mut h_btns: Vec<char> = Vec::new();
+        let mut v_btns: Vec<char> = Vec::new();
+
+        let empty_coords = btn_coords[&'_'];
+
+        let coords = btn_coords[&curr_ch];
+        let next_coords = btn_coords[&next_ch];
+        let v_dist = next_coords.0 as isize - coords.0 as isize;
+        let h_dist = next_coords.1 as isize - coords.1 as isize;
+        let v_ch = match v_dist {
+            n if n > 0 => 'v',
+            _ => '^',
+        };
+        let h_ch = match h_dist {
+            n if n > 0 => '>',
+            _ => '<',
+        };
+        if coords.1 == empty_coords.1 && coords.0.wrapping_add_signed(v_dist) == empty_coords.0 {
+            v_btns.extend(iter::repeat(h_ch).take(h_dist.abs() as usize));
+            v_btns.extend(iter::repeat(v_ch).take(v_dist.abs() as usize));
+        } else {
+            v_btns.extend(iter::repeat(v_ch).take(v_dist.abs() as usize));
+            v_btns.extend(iter::repeat(h_ch).take(h_dist.abs() as usize));
+        }
+        v_btns.push('A');
+
+        if coords.0 == empty_coords.0 && coords.1.wrapping_add_signed(h_dist) == empty_coords.1 {
+            h_btns.extend(iter::repeat(v_ch).take(v_dist.abs() as usize));
+            h_btns.extend(iter::repeat(h_ch).take(h_dist.abs() as usize));
+        } else {
+            h_btns.extend(iter::repeat(h_ch).take(h_dist.abs() as usize));
+            h_btns.extend(iter::repeat(v_ch).take(v_dist.abs() as usize));
+        }
+        h_btns.push('A');
+
+        (h_btns, v_btns)
+    }
+
+    fn find_shortest_seq_len_keypad(
+        code: Vec<char>,
+        keypad_coords: &HashMap<char, (usize, usize)>,
+        control_pad_coords: &HashMap<char, (usize, usize)>,
+        depth: u64,
+    ) -> u64 {
+        let mut curr_ch = 'A';
+        let mut len = 0;
+
+        let mut memo: HashMap<(char, char, u64), u64> = HashMap::new();
+
+        for next_ch in code {
+            let (h_btns, v_btns) = get_controls(curr_ch, next_ch, keypad_coords);
+
+            let memo_key = (curr_ch, next_ch, depth);
+            let shortest = if let Some(cached) = memo.get(&memo_key) {
+                *cached
+            } else {
+                let h_res =
+                    find_shortest_seq_len_control_pad(h_btns, control_pad_coords, depth, &mut memo);
+                let v_res =
+                    find_shortest_seq_len_control_pad(v_btns, control_pad_coords, depth, &mut memo);
+
+                let shorter = if v_res < h_res { v_res } else { h_res };
+                memo.insert(memo_key, shorter);
+                shorter
+            };
+            len += shortest;
+
+            curr_ch = next_ch;
+        }
+
+        len
+    }
+
+    fn find_shortest_seq_len_control_pad(
+        code: Vec<char>,
+        control_pad_coords: &HashMap<char, (usize, usize)>,
+        remn: u64,
+        memo: &mut HashMap<(char, char, u64), u64>,
+    ) -> u64 {
+        if remn == 0 {
+            return code.len() as u64;
+        }
+
+        let mut curr_ch = 'A';
+        let mut len = 0;
+        for next_ch in code {
+            let (h_btns, v_btns) = get_controls(curr_ch, next_ch, control_pad_coords);
+
+            let memo_key = (curr_ch, next_ch, remn - 1);
+
+            let shortest = if let Some(cached) = memo.get(&memo_key) {
+                *cached
+            } else {
+                let h_res =
+                    find_shortest_seq_len_control_pad(h_btns, control_pad_coords, remn - 1, memo);
+                let v_res =
+                    find_shortest_seq_len_control_pad(v_btns, control_pad_coords, remn - 1, memo);
+                let shorter = if v_res < h_res { v_res } else { h_res };
+                memo.insert(memo_key, shorter);
+                shorter
+            };
+            len += shortest;
+
+            curr_ch = next_ch;
+        }
+
+        len
+    }
+
+    #[test]
+    fn part1() {
+        let codes = load_inputs();
+
+        let (keypad_coords, control_pad_coords) = get_coords();
+
+        let res: u64 = codes
+            .iter()
+            .map(|s| {
+                let shortest = find_shortest_seq_len_keypad(
+                    s.chars().collect(),
+                    &keypad_coords,
+                    &control_pad_coords,
+                    2,
+                );
+                let code_parsed: u64 = s[..3].parse().unwrap();
+                shortest * code_parsed
+            })
+            .sum();
+
+        println!("D21P1: {res}");
+    }
+
+    #[test]
+    fn part2() {
+        let codes = load_inputs();
+
+        let (keypad_coords, control_pad_coords) = get_coords();
+
+        let res: u64 = codes
+            .iter()
+            .map(|s| {
+                let shortest = find_shortest_seq_len_keypad(
+                    s.chars().collect(),
+                    &keypad_coords,
+                    &control_pad_coords,
+                    25,
+                );
+                let code_parsed: u64 = s[..3].parse().unwrap();
+                shortest * code_parsed
+            })
+            .sum();
+
+        println!("D21P2: {res}");
+    }
+}
