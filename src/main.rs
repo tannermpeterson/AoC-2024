@@ -2713,3 +2713,103 @@ mod day21 {
         println!("D21P2: {res}");
     }
 }
+
+mod day22 {
+    use std::{
+        collections::{HashMap, HashSet},
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    fn load_inputs() -> Vec<u64> {
+        let file = File::open("inputs/day22.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        buf_reader
+            .lines()
+            .map(|s| s.unwrap().parse::<u64>().unwrap())
+            .collect()
+    }
+
+    fn gen_next_secret(mut initial_secret: u64) -> u64 {
+        initial_secret = (initial_secret ^ (initial_secret * 64)) % 16777216;
+        initial_secret = (initial_secret ^ (initial_secret / 32)) % 16777216;
+        initial_secret = (initial_secret ^ (initial_secret * 2048)) % 16777216;
+        initial_secret
+    }
+
+    fn gen_secret_k(initial_secret: u64, n_iters: u32) -> u64 {
+        let mut next_secret = initial_secret;
+        for _ in 0..n_iters {
+            next_secret = gen_next_secret(next_secret);
+        }
+        next_secret
+    }
+
+    #[test]
+    fn part1() {
+        let initial_secrets = load_inputs();
+
+        let res: u64 = initial_secrets.iter().map(|n| gen_secret_k(*n, 2000)).sum();
+
+        println!("D22P1: {res}");
+    }
+
+    fn update_seq_profit(
+        seq_to_profit: &mut HashMap<(i64, i64, i64, i64), u64>,
+        initial_secret: u64,
+        seq_len: u32,
+    ) {
+        let mut seqs_found: HashSet<(i64, i64, i64, i64)> = HashSet::new();
+        let (mut prev_diff_1, mut prev_diff_2, mut prev_diff_3, mut prev_secret) = {
+            let prev_secret_4 = initial_secret;
+            let prev_secret_3 = gen_next_secret(prev_secret_4);
+            let prev_secret_2 = gen_next_secret(prev_secret_3);
+            let prev_secret_1 = gen_next_secret(prev_secret_2);
+
+            let prev_diff_3 = (prev_secret_3 % 10) as i64 - (prev_secret_4 % 10) as i64;
+            let prev_diff_2 = (prev_secret_2 % 10) as i64 - (prev_secret_3 % 10) as i64;
+            let prev_diff_1 = (prev_secret_1 % 10) as i64 - (prev_secret_2 % 10) as i64;
+
+            (prev_diff_1, prev_diff_2, prev_diff_3, prev_secret_1)
+        };
+
+        for n in 3..seq_len {
+            let curr_secret = gen_next_secret(prev_secret);
+            let curr_price = curr_secret % 10;
+            let curr_diff = curr_price as i64 - (prev_secret % 10) as i64;
+            let seq = (prev_diff_3, prev_diff_2, prev_diff_1, curr_diff);
+            if !seqs_found.contains(&seq) {
+                *seq_to_profit.entry(seq).or_insert(0) += curr_price;
+                seqs_found.insert(seq);
+            }
+
+            prev_diff_3 = prev_diff_2;
+            prev_diff_2 = prev_diff_1;
+            prev_diff_1 = curr_diff;
+            prev_secret = curr_secret;
+        }
+    }
+
+    #[test]
+    fn part2() {
+        let initial_secrets = load_inputs();
+
+        let mut seq_to_profit: HashMap<(i64, i64, i64, i64), u64> = HashMap::new();
+
+        for initial_secret in initial_secrets {
+            update_seq_profit(&mut seq_to_profit, initial_secret, 2000);
+        }
+
+        let mut best_seq = (0, 0, 0, 0);
+        let mut res = 0;
+
+        for (seq, total) in seq_to_profit {
+            if total > res {
+                best_seq = seq;
+                res = total;
+            }
+        }
+
+        println!("D22P2: {res}");
+    }
+}
