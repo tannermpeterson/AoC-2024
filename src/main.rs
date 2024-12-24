@@ -2773,7 +2773,7 @@ mod day22 {
             (prev_diff_1, prev_diff_2, prev_diff_3, prev_secret_1)
         };
 
-        for n in 3..seq_len {
+        for _ in 3..seq_len {
             let curr_secret = gen_next_secret(prev_secret);
             let curr_price = curr_secret % 10;
             let curr_diff = curr_price as i64 - (prev_secret % 10) as i64;
@@ -2795,20 +2795,11 @@ mod day22 {
         let initial_secrets = load_inputs();
 
         let mut seq_to_profit: HashMap<(i64, i64, i64, i64), u64> = HashMap::new();
-
         for initial_secret in initial_secrets {
             update_seq_profit(&mut seq_to_profit, initial_secret, 2000);
         }
 
-        let mut best_seq = (0, 0, 0, 0);
-        let mut res = 0;
-
-        for (seq, total) in seq_to_profit {
-            if total > res {
-                best_seq = seq;
-                res = total;
-            }
-        }
+        let res = seq_to_profit.values().max().unwrap();
 
         println!("D22P2: {res}");
     }
