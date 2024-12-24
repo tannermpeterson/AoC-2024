@@ -2804,3 +2804,98 @@ mod day22 {
         println!("D22P2: {res}");
     }
 }
+
+mod day23 {
+    use std::{
+        collections::{BTreeSet, HashMap, HashSet},
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    fn load_inputs() -> Vec<(String, String)> {
+        let file = File::open("inputs/day23.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        buf_reader
+            .lines()
+            .map(|s| {
+                let s = s.unwrap();
+                let (a, b) = s.trim().split_once("-").unwrap();
+                (a.to_string(), b.to_string())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn part1() {
+        let connection_pairs = load_inputs();
+
+        let mut connections: HashMap<&str, HashSet<&str>> = HashMap::new();
+        for (a, b) in connection_pairs.iter() {
+            connections.entry(a).or_default().insert(b);
+            connections.entry(b).or_default().insert(a);
+        }
+
+        let mut res = 0;
+        let mut checked: HashSet<&str> = HashSet::new();
+        for (pc1, cons1) in connections.iter() {
+            if !pc1.starts_with("t") {
+                continue;
+            }
+            checked.insert(pc1);
+            let cons1: Vec<&str> = cons1.iter().map(|s| *s).collect();
+            for i2 in 0..cons1.len() - 1 {
+                let pc2 = cons1[i2];
+                if checked.contains(pc2) {
+                    continue;
+                }
+                let cons2 = &connections[pc2];
+                for i3 in i2 + 1..cons1.len() {
+                    let pc3 = cons1[i3];
+                    if cons2.contains(pc3) && !checked.contains(pc3) {
+                        res += 1;
+                    }
+                }
+            }
+        }
+
+        println!("D23P1: {res}");
+    }
+
+    #[test]
+    fn part2() {
+        let connection_pairs = load_inputs();
+
+        let mut connections: HashMap<&String, BTreeSet<&String>> = HashMap::new();
+        for (a, b) in &connection_pairs {
+            connections.entry(a).or_default().insert(b);
+            connections.entry(b).or_default().insert(a);
+        }
+
+        let mut sets: HashSet<BTreeSet<&String>> = connection_pairs
+            .iter()
+            .map(|(a, b)| BTreeSet::from([a, b]))
+            .collect();
+
+        while sets.len() > 1 {
+            let mut new_sets: HashSet<BTreeSet<&String>> = HashSet::new();
+            for (pc, cons) in &connections {
+                for set in &sets {
+                    if set.is_subset(cons) {
+                        let mut new_set = set.clone();
+                        new_set.insert(pc);
+                        new_sets.insert(new_set);
+                    }
+                }
+            }
+            sets = new_sets;
+        }
+
+        let largest_network = sets.into_iter().next().unwrap();
+        let mut largest_network: Vec<String> =
+            largest_network.into_iter().map(|s| s.to_owned()).collect();
+        largest_network.sort();
+        let largest_network = largest_network.join(",");
+
+        println!("D23P2: {largest_network:?}");
+    }
+}
