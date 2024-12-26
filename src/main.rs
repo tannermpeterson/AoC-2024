@@ -2899,3 +2899,436 @@ mod day23 {
         println!("D23P2: {largest_network:?}");
     }
 }
+
+mod day24 {
+    use std::{
+        collections::{HashMap, HashSet},
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    #[derive(Debug, Clone)]
+    struct Gate {
+        in1: String,
+        in2: String,
+        out: String,
+        op: fn(bool, bool) -> bool,
+        op_name: Ops,
+        gtype: GateTypes,
+    }
+
+    impl Gate {
+        fn new(
+            in1: String,
+            in2: String,
+            out: String,
+            op: fn(bool, bool) -> bool,
+            op_name: Ops,
+        ) -> Self {
+            let gtype = match (
+                op_name,
+                in1.starts_with("x") || in1.starts_with("y"),
+                in1.contains("00"),
+            ) {
+                (Ops::OR, _, _) => GateTypes::OR,
+                (Ops::XOR, true, _) => GateTypes::XOR1,
+                (Ops::XOR, false, _) => GateTypes::XOR2,
+                (Ops::AND, true, true) => GateTypes::OR, // lying so this is easier
+                (Ops::AND, true, false) => GateTypes::AND1,
+                (Ops::AND, false, _) => GateTypes::AND2,
+            };
+            Self {
+                in1,
+                in2,
+                out,
+                op,
+                op_name,
+                gtype,
+            }
+        }
+
+        fn run(&self, wires: &mut HashMap<String, bool>) -> Result<bool, ()> {
+            let in1 = wires.get(&self.in1);
+            let in2 = wires.get(&self.in2);
+            if let (Some(in1), Some(in2)) = (in1, in2) {
+                let res = (self.op)(*in1, *in2);
+                wires.insert(self.out.clone(), res);
+                Ok(res)
+            } else {
+                Err(())
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum Ops {
+        AND,
+        XOR,
+        OR,
+    }
+
+    #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+    enum GateTypes {
+        AND1,
+        AND2,
+        XOR1,
+        XOR2,
+        OR,
+    }
+
+    #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+    enum Wires {
+        X,
+        Y,
+        AND1,
+        AND2,
+        XOR1,
+        SUM,
+        COUT,
+    }
+
+    fn and(a: bool, b: bool) -> bool {
+        a && b
+    }
+    fn or(a: bool, b: bool) -> bool {
+        a || b
+    }
+    fn xor(a: bool, b: bool) -> bool {
+        a ^ b
+    }
+
+    fn load_inputs() -> (HashMap<String, bool>, HashMap<String, Gate>) {
+        let file = File::open("inputs/day24.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        let mut buf_reader_lines = buf_reader.lines();
+
+        let init_values = buf_reader_lines
+            .by_ref()
+            .map_while(|s| {
+                let s = s.unwrap();
+                let s = s.trim();
+                if s.len() == 0 {
+                    None
+                } else {
+                    let (name, val) = s.split_once(": ").unwrap();
+                    Some((name.to_owned(), val.parse::<u32>().unwrap() > 0))
+                }
+            })
+            .collect();
+
+        let gates = buf_reader_lines
+            .map(|s| {
+                let s = s.unwrap();
+                let s = s.trim();
+                let (lhs, out) = s.split_once(" -> ").unwrap();
+                let lhs: Vec<String> = lhs.split(" ").map(|s| s.to_owned()).collect();
+                let [in1, op_name, in2] = &lhs[..] else {
+                    panic!("invalid line")
+                };
+                let op_name = match &op_name[..] {
+                    "AND" => Ops::AND,
+                    "OR" => Ops::OR,
+                    "XOR" => Ops::XOR,
+                    invalid_op => panic!("invalid op {invalid_op}"),
+                };
+                let op = match op_name {
+                    Ops::AND => and as fn(bool, bool) -> bool,
+                    Ops::OR => or as fn(bool, bool) -> bool,
+                    Ops::XOR => xor as fn(bool, bool) -> bool,
+                };
+                (
+                    out.to_owned(),
+                    Gate::new(in1.to_owned(), in2.to_owned(), out.to_owned(), op, op_name),
+                )
+            })
+            .collect();
+
+        (init_values, gates)
+    }
+
+    fn resolve(
+        out_wire: &String,
+        wires: &mut HashMap<String, bool>,
+        gates: &HashMap<String, Gate>,
+        high_outs: &mut HashSet<String>,
+    ) {
+        if wires.contains_key(out_wire) {
+            return;
+        }
+
+        let gate = &gates[out_wire];
+        resolve(&gate.in1, wires, gates, high_outs);
+        resolve(&gate.in2, wires, gates, high_outs);
+        let res = gate
+            .run(wires)
+            .expect("dependencies not resolved for {out_wire}");
+        if res {
+            high_outs.insert(gate.out.to_owned());
+        }
+    }
+
+    #[test]
+    fn part1() {
+        let (mut wires, gates) = load_inputs();
+
+        let mut zs: Vec<&String> = gates.keys().filter(|k| k.starts_with("z")).collect();
+        zs.sort_by_key(|z| {
+            let zn = &z[1..].parse::<u32>().unwrap();
+            *zn
+        });
+
+        let res = zs.into_iter().enumerate().fold(0, |acc, (idx, name)| {
+            resolve(name, &mut wires, &gates, &mut HashSet::new());
+            acc + ((wires[name] as u64) << (idx as u64))
+        });
+
+        println!("D24P1: {res}");
+    }
+
+    fn create_test_inputs(x: u64, y: u64, output_msb_pos: u32) -> HashMap<String, bool> {
+        let mut inputs = HashMap::new();
+        for bit_pos in 0..output_msb_pos {
+            let x_name = format!("x{:02}", bit_pos);
+            let y_name = format!("y{:02}", bit_pos);
+            let mask = 1 << bit_pos;
+            inputs.insert(x_name, (x & mask) > 0);
+            inputs.insert(y_name, (y & mask) > 0);
+        }
+        inputs
+    }
+
+    // fn find_swap(x: u64, y: u64, bit_pos: u32, res: u64) -> [String; 2] {}
+
+    #[test]
+    fn part2() {
+        let (_, og_gates) = load_inputs();
+
+        let output_msb_pos = og_gates
+            .keys()
+            .filter(|k| k.starts_with("z"))
+            .map(|z| {
+                let zn = &z[1..].parse::<u32>().unwrap();
+                *zn
+            })
+            .max()
+            .unwrap();
+
+        let mut gates = og_gates.clone();
+
+        // first ensure that all zs are hooked up to the right kind of gate
+        loop {
+            let mut zswap: Option<String> = None;
+            let mut iswap_type: Option<GateTypes> = None;
+            let mut iswap: Option<String> = None;
+            for (name, gate) in &mut gates {
+                if !gate.out.starts_with("z") {
+                    continue;
+                }
+                let expected_gtype = if gate.out.contains(&format!("{}", output_msb_pos)) {
+                    GateTypes::OR
+                } else if gate.out.contains("00") {
+                    GateTypes::XOR1
+                } else {
+                    GateTypes::XOR2
+                };
+                if gate.gtype != expected_gtype {
+                    zswap = Some(name.to_owned());
+                    iswap_type = Some(expected_gtype);
+                    break;
+                }
+            }
+            if zswap.is_none() {
+                break;
+            }
+            for (name, gate) in &mut gates {
+                if gate.out.starts_with("z") || gate.gtype != iswap_type.unwrap() {
+                    continue;
+                }
+                // TODO really need to do a more thorough check to valid XOR1,
+                // but not needed for this dataset
+                iswap = Some(name.to_owned());
+                break;
+            }
+
+            if let Some(n1) = zswap {
+                let n2 = iswap.expect("only one swap found");
+                println!("ZSWAP: {n1}, {n2}");
+                swap(&mut gates, n1, n2);
+            }
+        }
+        // next make sure that all 'intermediate' gates are hooked up correctly
+        loop {
+            let mut aswap: Option<String> = None;
+            let mut aswap_type: Option<GateTypes> = None;
+            let mut bswap: Option<String> = None;
+            let mut bswap_type: Option<GateTypes> = None;
+            for name in gates.keys() {
+                let gate = gates.get(name).unwrap();
+                // ignore half adder on bit 0 since it's not needed for this dataset
+                let (in_type_1, in_type_2) = match gate.gtype {
+                    GateTypes::XOR2 => (GateTypes::OR, GateTypes::XOR1),
+                    GateTypes::AND2 => (GateTypes::OR, GateTypes::XOR1),
+                    GateTypes::OR => (GateTypes::AND1, GateTypes::AND2),
+                    _ => continue,
+                };
+                let name_in1 = &gate.in1;
+                let name_in2 = &gate.in2;
+                if gate.gtype == GateTypes::OR && name_in1.starts_with("x")
+                    || name_in1.starts_with("y")
+                {
+                    continue;
+                }
+                let in1 = gates.get(name_in1).unwrap();
+                let in2 = gates.get(name_in2).unwrap();
+                let (aswap_, aswap_type_, bswap_type_) = if in1.gtype == in_type_1 {
+                    if in2.gtype == in_type_2 {
+                        continue;
+                    }
+                    (name_in2.to_owned(), in2.gtype, in_type_2)
+                } else if in1.gtype == in_type_2 {
+                    if in2.gtype == in_type_1 {
+                        continue;
+                    }
+                    (name_in2.to_owned(), in2.gtype, in_type_1)
+                } else if in2.gtype == in_type_1 {
+                    (name_in1.to_owned(), in1.gtype, in_type_2)
+                } else {
+                    (name_in1.to_owned(), in1.gtype, in_type_1)
+                };
+                // if // TODO if swap type is AND1 and the AND1 is on bit 0, skip
+                aswap = Some(aswap_);
+                aswap_type = Some(aswap_type_);
+                bswap_type = Some(bswap_type_);
+                break;
+            }
+
+            if aswap.is_none() {
+                break;
+            }
+            let n1 = aswap.unwrap();
+            let aswap_type = aswap_type.unwrap();
+            let bswap_type = bswap_type.unwrap();
+            println!("$$$ {aswap_type:?}: {n1}, {bswap_type:?}: ?");
+
+            for name in gates.keys() {
+                if *name == n1 {
+                    continue;
+                }
+                let gate = gates.get(name).unwrap();
+                let (in_type_1, in_type_2) = match gate.gtype {
+                    GateTypes::XOR2 => (GateTypes::OR, GateTypes::XOR1),
+                    GateTypes::AND2 => (GateTypes::OR, GateTypes::XOR1),
+                    GateTypes::OR => (GateTypes::AND1, GateTypes::AND2),
+                    _ => continue,
+                };
+                let name_in1 = &gate.in1;
+                let name_in2 = &gate.in2;
+                if gate.gtype == GateTypes::OR && name_in1.starts_with("x")
+                    || name_in1.starts_with("y")
+                {
+                    continue;
+                }
+                let in1 = gates.get(name_in1).expect(&format!("key {name_in1}"));
+                let in2 = gates.get(name_in2).expect(&format!("key {name_in2}"));
+                if in1.gtype != in_type_1
+                    && in1.gtype != in_type_2  // input does is invalid for this gate
+                    && in1.gtype == bswap_type  // input is the other type for the swap
+                    && (aswap_type == in_type_1 || aswap_type == in_type_2)  // the incoming gate is the right type
+                    && in2.gtype != aswap_type
+                // ^^ the other input to this gate is not the same as the incoming gate (if not AND)
+                {
+                    bswap = Some(name_in1.to_owned());
+                    break;
+                } else if in2.gtype != in_type_1
+                    && in2.gtype != in_type_2  // input does is invalid for this gate
+                    && in2.gtype == bswap_type  // input is the other type for the swap
+                    && (aswap_type == in_type_1 || aswap_type == in_type_2)  // the incoming gate is the right type
+                    && in1.gtype != aswap_type
+                // ^^ the other input to this gate is not the same as the incoming gate (if not AND)
+                {
+                    bswap = Some(name_in2.to_owned());
+                    break;
+                }
+            }
+
+            let n2 = bswap.expect("only one swap found");
+            println!("GSWAP: {n1}, {n2}");
+            swap(&mut gates, n1, n2);
+        }
+
+        let mut zs: Vec<&String> = gates.keys().filter(|k| k.starts_with("z")).collect();
+        zs.sort_by_key(|z| {
+            let zn = &z[1..].parse::<u32>().unwrap();
+            *zn
+        });
+
+        let mut failures: Vec<(u64, (u64, u64), HashSet<String>)> = Vec::new();
+        // now that all outputs are going to the correct type of gate, need to put them on the
+        // right bits
+        for bit_pos in 0..output_msb_pos {
+            for (x, y) in [(1, 0), (1, 1)] {
+                let x_shifted = x << bit_pos;
+                let y_shifted = y << bit_pos;
+                let mut wires = create_test_inputs(x_shifted, y_shifted, output_msb_pos);
+                let mut high_outs = HashSet::new();
+                let res = zs.iter().enumerate().fold(0, |acc, (idx, name)| {
+                    resolve(name, &mut wires, &gates, &mut high_outs);
+                    let wire_val = wires.get(*name).expect(&format!("key {name} not found"));
+                    acc + ((*wire_val as u64) << (idx as u64))
+                });
+                if x_shifted + y_shifted != res {
+                    // println!("!!! BIT {bit_pos}: {x_shifted} + {y_shifted} != {res}");
+                    failures.push((res, (x_shifted, y_shifted), high_outs));
+                }
+            }
+        }
+
+        println!("!!! {failures:?}");
+
+        let mut fixed_idxs: HashSet<usize> = HashSet::new();
+        let mut num_failures_remaining = failures.len();
+
+        for i1 in 0..failures.len() - 1 {
+            if fixed_idxs.contains(&i1) {
+                continue;
+            }
+            let f1 = &failures[i1];
+            for i2 in i1 + 1..failures.len() {
+                if fixed_idxs.contains(&i2) {
+                    continue;
+                }
+                let f2 = &failures[i2];
+                let expected_res_1 = (f1.1 .0) + (f1.1 .1);
+                let expected_res_2 = (f2.1 .0) + (f2.1 .1);
+                if f1.0 != expected_res_2 || f2.0 != expected_res_1 {
+                    continue;
+                }
+                println!("... {f1:?} {f2:?}");
+                find_swap(&f1, &f2, &mut gates, num_failures_remaining);
+                fixed_idxs.extend([i1, i2]);
+                num_failures_remaining -= 2;
+                break;
+            }
+        }
+    }
+
+    fn find_swap(
+        f1: &(u64, (u64, u64), HashSet<String>),
+        f2: &(u64, (u64, u64), HashSet<String>),
+        gates: &mut HashMap<String, Gate>,
+        init_num_failures: usize,
+    ) {
+        // TODO
+    }
+
+    fn swap(gates: &mut HashMap<String, Gate>, n1: String, n2: String) {
+        // TODO would it be correct to just wrap the gates in Cell/RefCell so that they can be
+        // mutated without removing from the dict?
+        let mut g1 = gates.remove(&n1).unwrap();
+        let mut g2 = gates.remove(&n2).unwrap();
+        g1.out = n2.clone();
+        g2.out = n1.clone();
+        gates.insert(n2, g1);
+        gates.insert(n1, g2);
+    }
+}
