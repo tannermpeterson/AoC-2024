@@ -3332,3 +3332,61 @@ mod day24 {
         gates.insert(n1, g2);
     }
 }
+
+mod day25 {
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader},
+    };
+
+    fn load_inputs() -> (Vec<Vec<u32>>, Vec<Vec<u32>>) {
+        let file = File::open("inputs/day25.txt").unwrap();
+        let buf_reader = BufReader::new(file);
+        let mut buf_reader_lines = buf_reader.lines();
+
+        let mut locks = Vec::new();
+        let mut keys = Vec::new();
+
+        let mut parsing = true;
+        while parsing {
+            let is_lock = buf_reader_lines.next().unwrap().unwrap().starts_with('#');
+            let mut heights = vec![0u32; 5];
+            for _r in 0..5 {
+                let l = buf_reader_lines.next().unwrap().unwrap();
+                let mut l = l.chars();
+                for c in 0..5 {
+                    heights[c] += (l.next().unwrap() == '#') as u32;
+                }
+            }
+            buf_reader_lines.next();
+            if is_lock {
+                locks.push(heights);
+            } else {
+                keys.push(heights);
+            }
+            parsing = buf_reader_lines.next().is_some();
+        }
+
+        (locks, keys)
+    }
+
+    #[test]
+    fn part1() {
+        let (locks, keys) = load_inputs();
+
+        let mut res = 0;
+
+        for l in locks {
+            'k: for k in &keys {
+                for c in 0..5 {
+                    if l[c] + k[c] > 5 {
+                        continue 'k;
+                    }
+                }
+                res += 1;
+            }
+        }
+
+        println!("D25P1: {res}");
+    }
+}
